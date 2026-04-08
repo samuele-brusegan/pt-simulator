@@ -1,0 +1,48 @@
+[
+  {
+    "id": "pc-generic",
+    "type": "pc",
+    "name": "Generic PC",
+    "icon": "pc-icon",
+    "defaultInterfaces": [
+      {"name": "FastEthernet0", "type": "fastethernet", "speedLimit": "100", "duplex": "full", "maxPorts": 1}
+    ],
+    "slots": {"nic": 2}
+  },
+  {
+    "id": "switch-2960",
+    "type": "switch",
+    "name": "Cisco 2960",
+    "icon": "switch-icon",
+    "defaultInterfaces": [
+      {"name": "FastEthernet0/1", "type": "fastethernet"},
+      {"name": "FastEthernet0/2", "type": "fastethernet"},
+      {"name": "FastEthernet0/24", "type": "fastethernet"}
+    ],
+    "managementInterface": "Vlan1"
+  },
+  {
+    "id": "router-2911",
+    "type": "router",
+    "name": "Cisco 2911",
+    "icon": "router-icon",
+    "defaultInterfaces": [
+      {"name": "GigabitEthernet0/0", "type": "gigabitethernet"},
+      {"name": "GigabitEthernet0/1", "type": "gigabitethernet"},
+      {"name": "Serial0/0/0", "type": "serial"},
+      {"name": "Serial0/0/1", "type": "serial"}
+    ],
+    "slots": {"HWIC-2T": 2, "WIC-1T": 4}
+  },
+  {
+    "id": "server-generic",
+    "type": "server",
+    "name": "Generic Server",
+    "icon": "server-icon",
+    "defaultInterfaces": [
+      {"name": "eth0", "type": "gigabitethernet"},
+      {"name": "eth1", "type": "gigabitethernet"}
+    ],
+    "slots": {"nic": 4}
+  }
+]

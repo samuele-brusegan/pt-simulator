@@ -1,0 +1,7 @@
+[
+  {"id": "ethernet-straight", "name": "Ethernet Straight-through", "color": "#3b82f6", "compatiblePairs": [["fastethernet","fastethernet"], ["gigabitethernet","gigabitethernet"], ["gigabitethernet","fastethernet"]]},
+  {"id": "ethernet-cross", "name": "Ethernet Cross-over", "color": "#f97316", "compatiblePairs": [["fastethernet","fastethernet"], ["serial","serial"], ["dtedce","dcedte"]]},
+  {"id": "fiber-single", "name": "Fiber Single-mode", "color": "#22c55e", "pairs": [["fiber-single","fiber-single"]]},
+  {"id": "fiber-multi", "name": "Fiber Multi-mode", "color": "#16a34a", "pairs": [["fiber-multi","fiber-multi"]]},
+  {"id": "serial", "name": "Serial DCE/DTE", "color": "#6b7280", "pairs": [["serial","serial"]]}
+]

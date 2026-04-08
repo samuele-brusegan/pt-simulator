@@ -1,0 +1,7 @@
+[
+  {"id": "fastethernet", "label": "FastEthernet", "speed": 100, "unit": "Mbps", "duplex": "half|full", "autoMDIX": false},
+  {"id": "gigabitethernet", "label": "GigabitEthernet", "speed": 1000, "unit": "Mbps", "duplex": "half|full", "autoMDIX": true},
+  {"id": "serial", "label": "Serial", "speed": 2, "unit": "Mbps", "duplex": "half", "clockRateDCE": 64000},
+  {"id": "fiber-single", "label": "Fiber Single-mode", "speed": 1000, "unit": "Mbps", "distance": "10km"},
+  {"id": "fiber-multi", "label": "Fiber Multi-mode", "speed": 1000, "unit": "Mbps", "distance": "550m"}
+]
