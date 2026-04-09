@@ -22,6 +22,10 @@ export class CanvasManager {
         this.clickHandlers = [];
         this.deviceDragHandler = null;
 
+        // References to objects to render
+        this.devices = [];
+        this.cables = [];
+
         this.bindEvents();
         this.resize();
     }
@@ -209,7 +213,10 @@ export class CanvasManager {
         const render = () => {
             this.clear();
             this.renderGrid();
-            // Actual device/cable rendering happens elsewhere
+            // Render cables first (behind devices)
+            this.cables.forEach(cable => cable.render(this.ctx));
+            // Render devices
+            this.devices.forEach(device => device.render(this.ctx));
             requestAnimationFrame(render);
         };
 

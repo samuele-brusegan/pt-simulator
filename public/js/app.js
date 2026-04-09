@@ -28,6 +28,10 @@ class PTSimulator {
             // Load saved network or create new one
             await this.loadNetwork();
 
+            // Set references for canvas rendering
+            this.canvasManager.devices = this.devices;
+            this.canvasManager.cables = this.cables;
+
             // Set up event listeners
             this.setupEventListeners();
 
