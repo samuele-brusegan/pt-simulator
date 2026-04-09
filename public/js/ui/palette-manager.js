@@ -30,6 +30,15 @@ export class PaletteManager {
             }
         });
 
+        // Handle click for device creation (no drag)
+        this.palette.addEventListener('click', (e) => {
+            const paletteItem = e.target.closest('.palette-item');
+            if (paletteItem && this._onDeviceCreate) {
+                const deviceType = paletteItem.dataset.deviceType;
+                this._onDeviceCreate(deviceType);
+            }
+        });
+
         this.palette.addEventListener('dragend', (e) => {
             this.draggedDeviceType = null;
             this.dragImage = null;

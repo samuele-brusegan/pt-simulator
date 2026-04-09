@@ -21,6 +21,7 @@ export class CanvasManager {
         // Event handlers
         this.clickHandlers = [];
         this.deviceDragHandler = null;
+        this.dropHandler = null;
 
         // References to objects to render
         this.devices = [];
@@ -140,6 +141,25 @@ export class CanvasManager {
 
         // Handle resize
         window.addEventListener('resize', () => this.resize());
+
+        // Handle drop events for device creation
+        this.canvas.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        this.canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const deviceType = e.dataTransfer.getData('text/plain');
+            if (deviceType && this.dropHandler) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const worldX = (x - this.offsetX) / this.scale;
+                const worldY = (y - this.offsetY) / this.scale;
+                this.dropHandler(worldX, worldY, deviceType);
+            }
+        });
     }
 
     resize() {
@@ -230,5 +250,9 @@ export class CanvasManager {
 
     onDeviceDrag(callback) {
         this.deviceDragHandler = callback;
+    }
+
+    onDrop(callback) {
+        this.dropHandler = callback;
     }
 }

@@ -117,7 +117,7 @@ class PTSimulator {
     }
 
     setupEventListeners() {
-        // Handle device creation from palette
+        // Handle device creation from palette (legacy center placement)
         this.paletteManager.onDeviceCreate((deviceType) => {
             const device = this.deviceFactory.createDevice(deviceType);
             // Position at center of canvas for now
@@ -138,10 +138,25 @@ class PTSimulator {
 
             if (clickedDevice) {
                 clickedDevice.setSelected(true);
-                // TODO: Show device properties or open CLI
+                // Set active device for CLI terminal
+                this.terminalManager.setActiveDevice(clickedDevice);
+                this.terminalManager.focus();
+            } else {
+                // Clicked on empty space, clear terminal
+                this.terminalManager.setActiveDevice(null);
             }
 
             this.renderNetwork();
+        });
+
+        // Handle canvas drops for device creation (from palette drag)
+        this.canvasManager.onDrop((x, y, deviceType) => {
+            const device = this.deviceFactory.createDevice(deviceType);
+            // Snap to grid (20px increments)
+            const snappedX = Math.round(x / 20) * 20;
+            const snappedY = Math.round(y / 20) * 20;
+            device.setPosition(snappedX, snappedY);
+            this.addDevice(device);
         });
 
         // Handle keyboard shortcuts
