@@ -159,15 +159,59 @@ class PTSimulator {
             this.addDevice(device);
         });
 
+        // Handle cable creation events
+        this.canvasManager.onCableStart((x, y, details) => {
+            // Visual feedback for cable start could be added here
+            // For now, we just track the state in canvas manager
+        });
+
+        this.canvasManager.onCableEnd((cable) => {
+            // Validate that cable doesn't already exist
+            const exists = this.cables.some(existingCable =>
+                (existingCable.startDevice === cable.startDevice &&
+                 existingCable.startPort === cable.startPort &&
+                 existingCable.endDevice === cable.endDevice &&
+                 existingCable.endPort === cable.endPort) ||
+                (existingCable.startDevice === cable.endDevice &&
+                 existingCable.startPort === cable.endPort &&
+                 existingCable.endDevice === cable.startDevice &&
+                 existingCable.endPort === cable.startPort)
+            );
+
+            if (!exists) {
+                this.addCable(cable);
+            }
+        });
+
         // Handle keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Delete') {
+                // Check if we're creating a cable - cancel it
+                if (this.canvasManager.isCreatingCable) {
+                    this.canvasManager.isCreatingCable = false;
+                    this.canvasManager.cableStartDevice = null;
+                    this.canvasManager.cableStartPort = null;
+                    this.canvasManager.tempCable = null;
+                    this.renderNetwork(); // Clear temp cable
+                    return;
+                }
+
                 const selectedDevice = this.devices.find(device => device.isSelected());
                 if (selectedDevice) {
                     if (confirm('Delete this device?')) {
                         this.removeDevice(selectedDevice);
                         this.renderNetwork();
                     }
+                }
+            }
+            // Escape key to cancel cable creation
+            else if (e.key === 'Escape') {
+                if (this.canvasManager.isCreatingCable) {
+                    this.canvasManager.isCreatingCable = false;
+                    this.canvasManager.cableStartDevice = null;
+                    this.canvasManager.cableStartPort = null;
+                    this.canvasManager.tempCable = null;
+                    this.renderNetwork(); // Clear temp cable
                 }
             }
         });

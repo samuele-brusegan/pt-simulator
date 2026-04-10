@@ -211,6 +211,28 @@ export class Device {
         };
     }
 
+    // Find the nearest port to a given point (returns null if no port within threshold)
+    getNearestPort(x, y, threshold = 15) {
+        let nearestPort = null;
+        let minDistance = threshold;
+
+        this.interfaces.forEach(port => {
+            const portPos = this.getPortPosition(port.name);
+            if (portPos) {
+                const distance = Math.sqrt(
+                    Math.pow(x - portPos.x, 2) +
+                    Math.pow(y - portPos.y, 2)
+                );
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPort = port;
+                }
+            }
+        });
+
+        return nearestPort;
+    }
+
     // Serialization for saving
     serialize() {
         return {

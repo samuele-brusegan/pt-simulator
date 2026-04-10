@@ -9,7 +9,7 @@ export class Server extends Device {
             model: options.model || 'server-generic',
             name: options.name || 'Server',
             width: options.width || 70,
-            height: options.height => 50
+            height: options.height || 50
         });
 
         // Set default interfaces if none provided
