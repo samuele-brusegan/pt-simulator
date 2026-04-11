@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="43.27" height="16.92" viewBox="0 0 43.27 16.92">
+<defs>
+<clipPath id="clip-0">
+<path clip-rule="nonzero" d="M 0 3 L 28 3 L 28 16.742188 L 0 16.742188 Z M 0 3 "/>
+</clipPath>
+<clipPath id="clip-1">
+<path clip-rule="nonzero" d="M 0 0.121094 L 32 0.121094 L 32 16.742188 L 0 16.742188 Z M 0 0.121094 "/>
+</clipPath>
+<clipPath id="clip-2">
+<path clip-rule="nonzero" d="M 0 0.121094 L 34 0.121094 L 34 16.742188 L 0 16.742188 Z M 0 0.121094 "/>
+</clipPath>
+<clipPath id="clip-3">
+<path clip-rule="nonzero" d="M 27 0.121094 L 32 0.121094 L 32 4 L 27 4 Z M 27 0.121094 "/>
+</clipPath>
+<clipPath id="clip-4">
+<path clip-rule="nonzero" d="M 25 0.121094 L 34 0.121094 L 34 7 L 25 7 Z M 25 0.121094 "/>
+</clipPath>
+<clipPath id="clip-5">
+<path clip-rule="nonzero" d="M 27 2 L 42.285156 2 L 42.285156 11 L 27 11 Z M 27 2 "/>
+</clipPath>
+<clipPath id="clip-6">
+<path clip-rule="nonzero" d="M 25 0.121094 L 42.285156 0.121094 L 42.285156 13 L 25 13 Z M 25 0.121094 "/>
+</clipPath>
+</defs>
+<g clip-path="url(#clip-0)">
+<path fill-rule="nonzero" fill="rgb(0.784302%, 43.920898%, 62.350464%)" fill-opacity="1" d="M 0.488281 16.226562 L 27.777344 16.226562 L 27.777344 3.808594 L 0.488281 3.808594 Z M 0.488281 16.226562 "/>
+<path fill="none" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 4.96519 5.224093 L 4.96519 131.498792 L 282.459701 131.498792 L 282.459701 5.224093 Z M 4.96519 5.224093 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+</g>
+<g clip-path="url(#clip-1)">
+<path fill-rule="nonzero" fill="rgb(0.784302%, 43.920898%, 62.350464%)" fill-opacity="1" d="M 27.777344 16.261719 L 27.777344 3.808594 L 0.476562 3.808594 L 3.988281 0.292969 L 31.265625 0.292969 L 31.265625 12.75 L 27.777344 16.261719 "/>
+</g>
+<g clip-path="url(#clip-2)">
+<path fill="none" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 282.459701 4.866599 L 282.459701 131.498792 L 4.846025 131.498792 L 40.555668 167.248157 L 317.931015 167.248157 L 317.931015 40.576242 Z M 282.459701 4.866599 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+</g>
+<g clip-path="url(#clip-3)">
+<path fill-rule="nonzero" fill="rgb(0.784302%, 43.920898%, 62.350464%)" fill-opacity="1" d="M 27.777344 3.808594 L 31.265625 0.292969 "/>
+</g>
+<g clip-path="url(#clip-4)">
+<path fill="none" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 282.459701 131.498792 L 317.931015 167.248157 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+</g>
+<path fill="none" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 282.459701 38.709331 L 4.96519 38.709331 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+<path fill-rule="nonzero" fill="rgb(0.784302%, 43.920898%, 62.350464%)" fill-opacity="1" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 317.931015 74.06148 L 282.459701 38.312116 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+<g clip-path="url(#clip-5)">
+<path fill-rule="nonzero" fill="rgb(0.784302%, 43.920898%, 62.350464%)" fill-opacity="1" d="M 42.410156 2.898438 L 38.921875 6.414062 L 27.777344 10.339844 L 31.265625 6.824219 L 42.410156 2.898438 "/>
+</g>
+<g clip-path="url(#clip-6)">
+<path fill="none" stroke-width="3.99994" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(100%, 100%, 100%)" stroke-opacity="1" stroke-miterlimit="4" d="M 431.2565 140.753906 L 395.785186 105.004541 L 282.459701 65.084418 L 317.931015 100.833782 Z M 431.2565 140.753906 " transform="matrix(0.0983409, 0, 0, -0.0983409, 0, 16.740305)"/>
+</g>
+</svg>
