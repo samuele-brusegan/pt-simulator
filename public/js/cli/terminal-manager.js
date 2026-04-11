@@ -1,7 +1,8 @@
 // Terminal Manager - Handles the CLI interface
 export class TerminalManager {
-    constructor(terminalElement) {
+    constructor(terminalElement, simulator = null) {
         this.terminal = terminalElement;
+        this.simulator = simulator;
         this.output = null;
         this.input = null;
         this.inputField = null;
@@ -9,6 +10,8 @@ export class TerminalManager {
         this.historyIndex = -1;
         this.isFocused = false;
         this.activeDevice = null; // Currently selected device for CLI
+        this.cliMode = 'user'; // 'user', 'privileged', 'global', 'interface'
+        this.currentInterface = null;
 
         this.createTerminalUI();
         this.bindEvents();
@@ -62,8 +65,12 @@ export class TerminalManager {
 
     setActiveDevice(device) {
         this.activeDevice = device;
+        this.cliMode = 'user';
+        this.currentInterface = null;
+        
+        // When device changes, reset output and prompt
+        this.clearOutput();
         this.updatePrompt();
-        this.clearOutput(); // Clear output when device changes
     }
 
     updatePrompt() {
@@ -73,8 +80,12 @@ export class TerminalManager {
         }
 
         // Determine prompt based on device state/mode
-        // For now, simple placeholder
-        const prompt = `${this.activeDevice.name}> `;
+        let suffix = '>';
+        if (this.cliMode === 'privileged') suffix = '#';
+        else if (this.cliMode === 'global') suffix = '(config)#';
+        else if (this.cliMode === 'interface') suffix = '(config-if)#';
+
+        const prompt = `${this.activeDevice.name}${suffix} `;
         document.querySelector('.terminal-prompt').textContent = prompt;
     }
 
@@ -106,62 +117,175 @@ export class TerminalManager {
     }
 
     processDeviceCommand(command) {
-        // Basic command parsing - would be expanded significantly
-        const parts = command.toLowerCase().split(/\s+/);
-        const cmd = parts[0];
+        const parts = command.trim().split(/\s+/);
+        const cmdRaw = parts[0].toLowerCase();
         const args = parts.slice(1);
 
-        switch (cmd) {
-            case 'help':
-                this.printHelp();
+        // Global commands available from anywhere
+        if (this.isMatch(cmdRaw, 'exit')) {
+            if (this.cliMode === 'interface') {
+                this.cliMode = 'global';
+                this.currentInterface = null;
+            } else if (this.cliMode === 'global') {
+                this.cliMode = 'privileged';
+            } else if (this.cliMode === 'privileged') {
+                this.cliMode = 'user';
+            }
+            this.updatePrompt();
+            return;
+        } else if (this.isMatch(cmdRaw, 'end')) {
+            if (this.cliMode !== 'user' && this.cliMode !== 'privileged') {
+                this.cliMode = 'privileged';
+                this.currentInterface = null;
+                this.updatePrompt();
+            }
+            return;
+        } else if (this.isMatch(cmdRaw, 'disable')) {
+            this.cliMode = 'user';
+            this.currentInterface = null;
+            this.updatePrompt();
+            return;
+        } else if (cmdRaw === 'help' || cmdRaw === '?') {
+            this.printHelp();
+            return;
+        }
+
+        // Mode-specific command parsing
+        switch (this.cliMode) {
+            case 'user':
+                this.processUserMode(cmdRaw, args);
                 break;
-            case 'exit':
-            case 'disable':
-                this.print('Exiting privileged mode');
+            case 'privileged':
+                this.processPrivilegedMode(cmdRaw, args);
                 break;
-            case 'enable':
-                this.print(`%SYS-5-RELOAD: Reload requested`);
-                break;
-            case 'configure':
-                if (args[0] === 'terminal') {
-                    this.print('Enter configuration mode, one line per line. End with CNTL/Z.');
-                } else {
-                    this.printError('Invalid command');
-                }
+            case 'global':
+                this.processGlobalMode(cmdRaw, args);
                 break;
             case 'interface':
-                if (args.length > 0) {
-                    this.print(`%LINK-5-CHANGED: Interface ${args[0]}, changed state to administratively down`);
-                } else {
-                    this.printError('Please specify an interface');
-                }
+                this.processInterfaceMode(cmdRaw, args);
                 break;
-            case 'ip':
-                if (args[0] === 'address' && args.length >= 3) {
+        }
+    }
+
+    // Utility for matching command shortcuts
+    isMatch(input, fullCommand) {
+        if (!input) return false;
+        return fullCommand.startsWith(input.toLowerCase());
+    }
+
+    processUserMode(cmd, args) {
+        if (this.isMatch(cmd, 'enable')) {
+            this.cliMode = 'privileged';
+            this.updatePrompt();
+        } else if (this.isMatch(cmd, 'show')) {
+            this.handleShowCommand(args);
+        } else {
+            this.printError(`% Unknown command or computer name, or unable to find computer address`);
+        }
+    }
+
+    processPrivilegedMode(cmd, args) {
+        if (this.isMatch(cmd, 'configure')) {
+            if (args[0] && this.isMatch(args[0], 'terminal')) {
+                this.cliMode = 'global';
+                this.print('Enter configuration commands, one per line. End with CNTL/Z.');
+                this.updatePrompt();
+            } else {
+                this.printError('% Incomplete command.');
+            }
+        } else if (this.isMatch(cmd, 'show')) {
+            this.handleShowCommand(args);
+        } else if (this.isMatch(cmd, 'write') || cmd === 'wr') {
+            this.print('Building configuration...');
+            this.print('[OK]');
+            this.simulator.saveNetwork(); // Use the global reference if available, otherwise just print
+        } else if (this.isMatch(cmd, 'copy')) {
+            if (args[0] && this.isMatch(args[0], 'running-config') && args[1] && this.isMatch(args[1], 'startup-config')) {
+                this.print('Destination filename [startup-config]?');
+                this.print('Building configuration...');
+                this.print('[OK]');
+            } else {
+                this.printError('% Incomplete command.');
+            }
+        } else {
+            this.printError(`% Invalid input detected at '^' marker.`);
+        }
+    }
+
+    processGlobalMode(cmd, args) {
+        if (cmd === 'hostname') {
+            if (args[0]) {
+                const newName = args[0];
+                this.activeDevice.name = newName;
+                if (this.activeDevice.config) this.activeDevice.config.hostname = newName;
+                document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
+                this.updatePrompt();
+            } else {
+                this.printError('Incomplete command.');
+            }
+        } else if (cmd === 'interface' || cmd === 'int') {
+            if (args[0]) {
+                // Find interface (handle shorthand like fa0/1 or GigabitEthernet0/0)
+                let searchName = args[0];
+                if (searchName.startsWith('fa')) searchName = searchName.replace('fa', 'FastEthernet');
+                if (searchName.startsWith('gi')) searchName = searchName.replace('gi', 'GigabitEthernet');
+                if (searchName.startsWith('se')) searchName = searchName.replace('se', 'Serial');
+
+                const intf = this.activeDevice.interfaces.find(i => 
+                    i.name.toLowerCase() === searchName.toLowerCase()
+                );
+
+                if (intf) {
+                    this.cliMode = 'interface';
+                    this.currentInterface = intf;
+                    this.updatePrompt();
+                } else {
+                    this.printError(`% Invalid interface ${args[0]}`);
+                }
+            } else {
+                this.printError('Incomplete command.');
+            }
+        } else if (cmd === 'do' && args[0] === 'show') {
+             this.handleShowCommand(args.slice(1));
+        } else {
+            this.printError(`% Invalid input detected at '^' marker.`);
+        }
+    }
+
+    processInterfaceMode(cmd, args) {
+        if (cmd === 'ip') {
+            if (args[0] === 'address' || args[0] === 'add') {
+                if (args.length >= 3) {
                     const ip = args[1];
                     const mask = args[2];
-                    // Find interface and set IP
-                    this.print(`%IP-5-ADDRCHANGED: Address ${ip} ${mask} on interface ${args[3] || 'unknown'}`);
+                    this.currentInterface.ip = ip;
+                    this.currentInterface.mask = mask; // assuming interface objects save mask too
+                    
+                    // Dispatch general event if UI needs to redraw
+                    document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
+                    // IOS doesn't normally print a confirmation on valid IP address
                 } else {
-                    this.printError('Usage: ip address <ip> <mask>');
+                    this.printError('Incomplete command.');
                 }
-                break;
-            case 'no':
-                if (args[0] === 'shutdown') {
-                    this.print(`%LINK-3-UPDOWN: Interface ${args[1] || 'unknown'}, changed state to up`);
-                } else {
-                    this.printError('Invalid command');
-                }
-                break;
-            case 'shutdown':
-                this.print(`%LINK-5-CHANGED: Interface ${args[0] || 'unknown'}, changed state to administratively down`);
-                break;
-            case 'show':
-                this.handleShowCommand(args);
-                break;
-            default:
+            } else {
                 this.printError(`% Invalid input detected at '^' marker.`);
-                break;
+            }
+        } else if (cmd === 'shutdown' || cmd === 'shut') {
+            this.currentInterface.status = 'down';
+            this.print(`\n%LINK-5-CHANGED: Interface ${this.currentInterface.name}, changed state to administratively down`);
+            document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
+        } else if (cmd === 'no') {
+            if (args[0] === 'shutdown' || args[0] === 'shut') {
+                this.currentInterface.status = 'up';
+                this.print(`\n%LINK-3-UPDOWN: Interface ${this.currentInterface.name}, changed state to up`);
+                document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
+            } else {
+                this.printError(`% Invalid input detected at '^' marker.`);
+            }
+        } else if (cmd === 'do' && args[0] === 'show') {
+            this.handleShowCommand(args.slice(1));
+        } else {
+            this.printError(`% Invalid input detected at '^' marker.`);
         }
     }
 
@@ -209,17 +333,34 @@ export class TerminalManager {
 
     printHelp() {
         this.print('Available commands:');
-        this.print('  enable                    Turn on privileged mode');
-        this.print('  configure terminal        Enter configuration mode');
-        this.print('  interface <name>          Select an interface to configure');
-        this.print('  ip address <ip> <mask>    Set IP address and subnet mask');
-        this.print('  no shutdown               Enable interface');
-        this.print('  shutdown                  Disable interface');
-        this.print('  show running-config       Display current configuration');
-        this.print('  show interfaces           Display interface status');
-        this.print('  show ip interface brief   Display brief interface status');
-        this.print('  show version              Display system version');
-        this.print('  exit/disable              Exit privileged mode');
+        
+        switch (this.cliMode) {
+            case 'user':
+                this.print('  enable                    Turn on privileged commands');
+                this.print('  show version              Display system version');
+                this.print('  exit                      Exit from the EXEC');
+                break;
+            case 'privileged':
+                this.print('  configure terminal        Enter configuration mode');
+                this.print('  disable                   Turn off privileged commands');
+                this.print('  copy running-config ...   Copy configuration');
+                this.print('  write/wr                  Write configuration');
+                this.print('  show ...                  Show running system information');
+                this.print('  exit                      Exit from the EXEC');
+                break;
+            case 'global':
+                this.print('  hostname <name>           Set system\'s network name');
+                this.print('  interface <id>            Select an interface to configure');
+                this.print('  no ...                    Negate a command or set its defaults');
+                this.print('  exit                      Exit from the configuration mode');
+                break;
+            case 'interface':
+                this.print('  ip address <ip> <mask>    Interface IP address and mask');
+                this.print('  shutdown                  Shutdown the selected interface');
+                this.print('  no shutdown               Enable the selected interface');
+                this.print('  exit                      Exit from the interface configuration mode');
+                break;
+        }
         this.print('  help                      Display this help message');
     }
 
@@ -238,16 +379,24 @@ export class TerminalManager {
     }
 
     handleTabCompletion() {
-        // Basic tab completion - would be much more sophisticated
-        const current = this.inputField.value;
+        const current = this.inputField.value.trim();
         if (!current) return;
 
-        // Simple command completion
-        const commands = ['help', 'enable', 'configure', 'exit', 'disable', 'interface', 'ip', 'no', 'shutdown', 'show'];
-        const matches = commands.filter(cmd => cmd.startsWith(current));
+        const parts = current.split(/\s+/);
+        const lastPart = parts[parts.length - 1];
+        
+        // Commands available in current mode
+        let commands = ['help', 'exit', 'end', 'show', 'do'];
+        if (this.cliMode === 'user') commands.push('enable');
+        if (this.cliMode === 'privileged') commands.push('configure', 'disable', 'copy', 'write');
+        if (this.cliMode === 'global') commands.push('hostname', 'interface', 'no');
+        if (this.cliMode === 'interface') commands.push('ip', 'shutdown', 'no');
+
+        const matches = commands.filter(cmd => cmd.startsWith(lastPart));
 
         if (matches.length === 1) {
-            this.inputField.value = matches[0] + ' ';
+            parts[parts.length - 1] = matches[0];
+            this.inputField.value = parts.join(' ') + ' ';
         } else if (matches.length > 1) {
             this.print('\n' + matches.join('  '));
             this.updatePrompt();

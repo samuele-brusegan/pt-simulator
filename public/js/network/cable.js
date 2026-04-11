@@ -43,13 +43,15 @@ export class Cable {
         // Same device not allowed
         if (startDevice === endDevice) return false;
 
-        // Check if ports are already connected to other cables
+        // Check if ports are already connected to other cables (using IDs for robustness)
         if (startDevice.getConnectedCables().some(c =>
-            c.startPort === startPort || c.endPort === startPort
+            (c.startDevice.id === startDevice.id && c.startPort.id === startPort.id) ||
+            (c.endDevice.id === startDevice.id && c.endPort.id === startPort.id)
         )) return false;
 
         if (endDevice.getConnectedCables().some(c =>
-            c.startPort === endPort || c.endPort === endPort
+            (c.startDevice.id === endDevice.id && c.startPort.id === endPort.id) ||
+            (c.endDevice.id === endDevice.id && c.endPort.id === endPort.id)
         )) return false;
 
         // Check compatibility based on cable type and interface types
@@ -118,16 +120,64 @@ export class Cable {
         ctx.quadraticCurveTo(controlX, controlY, endPos.x, endPos.y);
         ctx.stroke();
 
-        // Draw small circles at ends
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(startPos.x, startPos.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(endPos.x, endPos.y, 3, 0, Math.PI * 2);
-        ctx.fill();
+        // Draw labels near the ends
+        this.renderLabelAt(ctx, startPos, controlX, controlY, this.startPort, this.startDevice);
+        this.renderLabelAt(ctx, endPos, controlX, controlY, this.endPort, this.endDevice);
 
         ctx.restore();
+    }
+
+    renderLabelAt(ctx, pos, ctrlX, ctrlY, port, device) {
+        if (!port || !device) return;
+
+        // Vector towards the curve center
+        const dx = ctrlX - pos.x;
+        const dy = ctrlY - pos.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 1) return;
+
+        // Position the label slightly away from the device center
+        const offset = 45;
+        const lx = pos.x + (dx / dist) * offset;
+        const ly = pos.y + (dy / dist) * offset;
+
+        ctx.save();
+        ctx.translate(lx, ly);
+        
+        const name = port.name;
+        const ip = port.ip || '';
+        const cidr = port.mask ? this.maskToCIDR(port.mask) : '';
+        const text = `${name}${ip ? ' (' + ip + cidr + ')' : ''}`;
+        
+        ctx.font = '9px "Fira Code", monospace';
+        const metrics = ctx.measureText(text);
+        const pw = metrics.width + 4;
+        const ph = 12;
+
+        ctx.fillStyle = 'rgba(13, 17, 23, 0.85)';
+        ctx.fillRect(-pw/2, -ph/2, pw, ph);
+        
+        ctx.fillStyle = '#8b949e';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, 0);
+        
+        ctx.restore();
+    }
+
+    maskToCIDR(mask) {
+        if (!mask) return '';
+        const parts = mask.split('.');
+        if (parts.length !== 4) return '';
+        let bits = 0;
+        parts.forEach(part => {
+            let n = parseInt(part);
+            if (isNaN(n)) return;
+            // Count bits (classic approach)
+            const b = n.toString(2).split('1').length - 1;
+            bits += b;
+        });
+        return `/${bits}`;
     }
 
     // Serialize for saving

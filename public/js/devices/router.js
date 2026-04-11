@@ -8,15 +8,15 @@ export class Router extends Device {
             type: 'router',
             model: options.model || 'router-2911',
             name: options.name || 'Router',
-            width: options.width || 90,
-            height: options.height || 50
+            width: options.width || 70,
+            height: options.height || 45
         });
 
         // Set default interfaces if none provided
         if (this.interfaces.length === 0) {
             this.interfaces = [
                 {
-                    id: crypto.randomUUID(),
+                    id: Device.generateId(),
                     name: 'GigabitEthernet0/0',
                     type: 'gigabitethernet',
                     speed: 1000,
@@ -26,7 +26,7 @@ export class Router extends Device {
                     status: 'down'
                 },
                 {
-                    id: crypto.randomUUID(),
+                    id: Device.generateId(),
                     name: 'GigabitEthernet0/1',
                     type: 'gigabitethernet',
                     speed: 1000,
@@ -36,7 +36,7 @@ export class Router extends Device {
                     status: 'down'
                 },
                 {
-                    id: crypto.randomUUID(),
+                    id: Device.generateId(),
                     name: 'Serial0/0/0',
                     type: 'serial',
                     speed: 2,
@@ -63,30 +63,41 @@ export class Router extends Device {
             .join(':');
     }
 
+    getDeviceInfo() {
+        return {
+            icons: {
+                '2d': 'icons/2d/router.png',
+                '3d': 'icons/3d/router.svg'
+            }
+        };
+    }
+
     render(ctx) {
         super.render(ctx);
 
-        // Draw router-specific icon (router-like shape)
-        ctx.save();
-        ctx.translate(this.x, this.y);
+        // Draw router-specific icon details (fallback only)
+        if (!this.imageLoaded) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
 
-        // Router body
-        ctx.fillStyle = '#21262d';
-        ctx.strokeStyle = '#30363d';
-        ctx.lineWidth = 1;
+            // Router body
+            ctx.fillStyle = '#21262d';
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
 
-        // Main router body with antenna-like protrusions
-        ctx.beginPath();
-        ctx.roundRect(-35, -25, 70, 50, 6);
-        ctx.fill();
-        ctx.stroke();
+            // Main router body with antenna-like protrusions
+            ctx.beginPath();
+            ctx.roundRect(-35, -25, 70, 50, 6);
+            ctx.fill();
+            ctx.stroke();
 
-        // Antenna indicators
-        ctx.fillStyle = '#6b7280';
-        ctx.fillRect(-40, -30, 4, 4);
-        ctx.fillRect(36, -30, 4, 4);
+            // Antenna indicators
+            ctx.fillStyle = '#6b7280';
+            ctx.fillRect(-40, -30, 4, 4);
+            ctx.fillRect(36, -30, 4, 4);
 
-        ctx.restore();
+            ctx.restore();
+        }
     }
 
     // Basic routing table management

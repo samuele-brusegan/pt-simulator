@@ -27,26 +27,37 @@ export class DeviceFactory {
     }
 
     getDeviceInfo(type) {
-        // This would normally come from a config file
         const deviceInfo = {
             pc: {
                 name: 'PC',
-                icon: '💻',
+                icons: {
+                    '2d': 'icons/2d/pc.png',
+                    '3d': 'icons/3d/pc.svg'
+                },
                 description: 'Personal Computer'
             },
             switch: {
                 name: 'Switch',
-                icon: '🔀',
+                icons: {
+                    '2d': 'icons/2d/switch.png',
+                    '3d': 'icons/3d/workgroup switch.svg'
+                },
                 description: 'Network Switch'
             },
             router: {
                 name: 'Router',
-                icon: '📡',
+                icons: {
+                    '2d': 'icons/2d/router.png',
+                    '3d': 'icons/3d/router.svg'
+                },
                 description: 'Network Router'
             },
             server: {
                 name: 'Server',
-                icon: '🖥️',
+                icons: {
+                    '2d': 'icons/2d/server.png',
+                    '3d': 'icons/3d/fileserver.svg'
+                },
                 description: 'Network Server'
             }
         };

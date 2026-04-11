@@ -4,6 +4,8 @@ import { StorageManager } from './storage/storage.js';
 import { DeviceFactory } from './devices/device-factory.js';
 import { PaletteManager } from './ui/palette-manager.js';
 import { TerminalManager } from './cli/terminal-manager.js';
+import { ConfigWindowManager } from './ui/config-window-manager.js';
+import { Cable } from './network/cable.js';
 
 class PTSimulator {
     constructor() {
@@ -12,6 +14,7 @@ class PTSimulator {
         this.deviceFactory = new DeviceFactory();
         this.paletteManager = null;
         this.terminalManager = null;
+        this.configWindowManager = new ConfigWindowManager(this);
         this.devices = [];
         this.cables = [];
 
@@ -19,11 +22,18 @@ class PTSimulator {
     }
 
     async init() {
+        // Check for BroadcastChannel support
+        if (!window.BroadcastChannel) {
+            const errorMsg = 'Error: Your browser does not support BroadcastChannel. This app requires it for device configuration.';
+            document.body.innerHTML = `<div style="display:flex;justify-content:center;align-items:center;height:100vh;background:#0d1117;color:#f85149;font-family:monospace;text-align:center;padding:2rem;">${errorMsg}</div>`;
+            throw new Error(errorMsg);
+        }
+
         try {
             // Initialize managers
             this.canvasManager = new CanvasManager(document.getElementById('main-canvas'));
             this.paletteManager = new PaletteManager(document.getElementById('palette'), this.deviceFactory);
-            this.terminalManager = new TerminalManager(document.getElementById('terminal'));
+            this.terminalManager = new TerminalManager(document.getElementById('terminal'), this);
 
             // Load saved network or create new one
             await this.loadNetwork();
@@ -48,8 +58,39 @@ class PTSimulator {
         try {
             const networkData = await this.storageManager.loadNetwork();
             if (networkData) {
-                this.devices = networkData.devices || [];
-                this.cables = networkData.cables || [];
+                // 1. Re-instantiate devices
+                const devicesData = networkData.devices || [];
+                this.devices = devicesData.map(data => {
+                    const device = this.deviceFactory.createDevice(data.type, data);
+                    // Manually restore properties that might not be in constructor
+                    if (data.x !== undefined) device.x = data.x;
+                    if (data.y !== undefined) device.y = data.y;
+                    if (data.id) device.id = data.id;
+                    if (data.interfaces) device.interfaces = data.interfaces;
+                    if (data.hostname) device.hostname = data.hostname;
+                    return device;
+                });
+
+                // 2. Map IDs to device instances for cable reconstruction
+                const deviceMap = {};
+                this.devices.forEach(d => deviceMap[d.id] = d);
+
+                // 3. Re-instantiate cables
+                const cablesData = networkData.cables || [];
+                this.cables.length = 0; // Clear in-place to keep canvas reference sync
+                
+                cablesData.forEach(data => {
+                    const cable = Cable.deserialize(data, deviceMap);
+                    
+                    if (cable.startDevice && cable.endDevice && cable.startPort && cable.endPort) {
+                        this.cables.push(cable);
+                        
+                        // Restore connections in devices
+                        cable.startDevice.addConnection(cable);
+                        cable.endDevice.addConnection(cable);
+                    }
+                });
+
                 this.renderNetwork();
             }
         } catch (error) {
@@ -120,10 +161,17 @@ class PTSimulator {
         // Handle device creation from palette (legacy center placement)
         this.paletteManager.onDeviceCreate((deviceType) => {
             const device = this.deviceFactory.createDevice(deviceType);
-            // Position at center of canvas for now
+            
+            // Avoid overlapping at the center - add some jitter or offset
             const centerX = this.canvasManager.getWidth() / 2;
             const centerY = this.canvasManager.getHeight() / 2;
-            device.setPosition(centerX, centerY);
+            
+            // Initial offset based on existing device count
+            const offset = this.devices.length * 40;
+            const posX = Math.max(100, (centerX - 200) + (offset % 400));
+            const posY = Math.max(100, (centerY - 100) + Math.floor(offset / 400) * 60);
+            
+            device.setPosition(posX, posY);
             this.addDevice(device);
         });
 
@@ -147,6 +195,21 @@ class PTSimulator {
             }
 
             this.renderNetwork();
+        });
+
+        // Handle double click for configuration window
+        this.canvasManager.canvas.addEventListener('dblclick', (e) => {
+            const rect = this.canvasManager.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.canvasManager.offsetX) / this.canvasManager.scale;
+            const y = (e.clientY - rect.top - this.canvasManager.offsetY) / this.canvasManager.scale;
+
+            const clickedDevice = this.devices.find(device =>
+                device.containsPoint(x, y)
+            );
+
+            if (clickedDevice) {
+                this.configWindowManager.openWindow(clickedDevice.id);
+            }
         });
 
         // Handle canvas drops for device creation (from palette drag)
@@ -204,21 +267,44 @@ class PTSimulator {
                     }
                 }
             }
-            // Escape key to cancel cable creation
+            // Escape key to cancel cable creation or active tool
             else if (e.key === 'Escape') {
                 if (this.canvasManager.isCreatingCable) {
                     this.canvasManager.isCreatingCable = false;
                     this.canvasManager.cableStartDevice = null;
                     this.canvasManager.cableStartPort = null;
                     this.canvasManager.tempCable = null;
-                    this.renderNetwork(); // Clear temp cable
                 }
+                
+                // Reset active cable type and pointer
+                this.canvasManager.activeCableType = null;
+                this.canvasManager.canvas.style.cursor = 'default';
+                this.paletteManager.clearSelection();
+                
+                this.renderNetwork(); // Clear temp cable and refresh UI
             }
         });
 
         // Handle window resize
         window.addEventListener('resize', () => {
             this.canvasManager.resize();
+            this.renderNetwork();
+        });
+
+        // Handle device updates from CLI
+        document.addEventListener('deviceUpdated', () => {
+            this.renderNetwork();
+            this.saveNetwork();
+        });
+
+        // Handle global icon style changes
+        document.addEventListener('pt-simulator:iconStyleChanged', (e) => {
+            const newStyle = e.detail.style;
+            this.devices.forEach(device => {
+                if (device.updateIconStyle) {
+                    device.updateIconStyle(newStyle);
+                }
+            });
             this.renderNetwork();
         });
     }

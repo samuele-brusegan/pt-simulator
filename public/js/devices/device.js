@@ -1,7 +1,7 @@
 // Base Device Class
 export class Device {
     constructor(options = {}) {
-        this.id = options.id || crypto.randomUUID();
+        this.id = options.id || Device.generateId();
         this.type = options.type || 'generic';
         this.model = options.model || 'unknown';
         this.name = options.name || `${this.type.charAt(0).toUpperCase() + this.type.slice(1)}`;
@@ -28,6 +28,32 @@ export class Device {
 
         // Connection tracking
         this.connectedCables = [];
+
+        // Image icon for rendering
+        this.iconStyle = localStorage.getItem('pt-simulator-icon-style') || '2d';
+        this.image = new Image();
+        this.imageLoaded = false;
+        this.loadIcon();
+    }
+
+    loadIcon() {
+        const deviceInfo = this.getDeviceInfo();
+        if (deviceInfo && deviceInfo.icons) {
+            this.image.src = deviceInfo.icons[this.iconStyle] || deviceInfo.icons['2d'];
+            this.image.onload = () => { this.imageLoaded = true; };
+        }
+    }
+
+    updateIconStyle(style) {
+        this.iconStyle = style;
+        this.imageLoaded = false;
+        this.loadIcon();
+    }
+
+    getDeviceInfo() {
+        // This will be properly implemented/passed, for now we assume a global reference or factory access
+        // Ideally the factory should provide this. For MVP, we'll try to find it.
+        return null; // Will be overridden or fixed
     }
 
     // Position management
@@ -108,31 +134,38 @@ export class Device {
             ctx.rotate(this.rotation * Math.PI / 180);
         }
 
-        // Draw device body
-        ctx.fillStyle = this.selected ? '#fbbf24' : '#21262d';
-        ctx.strokeStyle = '#30363d';
-        ctx.lineWidth = 1;
+        // Draw device body (Image or fallback)
+        if (this.imageLoaded) {
+            ctx.drawImage(
+                this.image,
+                -this.width / 2,
+                -this.height / 2,
+                this.width,
+                this.height
+            );
+        } else {
+            ctx.fillStyle = this.selected ? '#fbbf24' : '#21262d';
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(-this.width / 2, -this.height / 2, this.width, this.height, 4);
+            ctx.fill();
+            ctx.stroke();
+        }
 
-        ctx.beginPath();
-        ctx.roundRect(
-            -this.width / 2,
-            -this.height / 2,
-            this.width,
-            this.height,
-            4
-        );
-        ctx.fill();
-        ctx.stroke();
+        // Draw selection highlight if needed
+        if (this.selected) {
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-this.width / 2 - 2, -this.height / 2 - 2, this.width + 4, this.height + 4);
+        }
 
-        // Draw device label
+        // Draw device label below
         ctx.fillStyle = '#c9d1d9';
         ctx.font = 'bold 10px sans-serif';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.name, 0, 0);
-
-        // Draw interfaces (ports)
-        this.renderInterfaces(ctx);
+        ctx.textBaseline = 'top';
+        ctx.fillText(this.name, 0, this.height / 2 + 5);
 
         // Restore context
         ctx.restore();
@@ -187,27 +220,11 @@ export class Device {
         return Math.sin(angle) * radius;
     }
 
-    // Get position of a specific interface/port
+    // Get position of a specific interface/port (returns device center as requested)
     getPortPosition(portName) {
-        const interfaceObj = this.interfaces.find(intf => intf.name === portName);
-        if (!interfaceObj) return null;
-
-        // Find index of this interface
-        const index = this.interfaces.indexOf(interfaceObj);
-        if (index === -1) return null;
-
-        // Calculate position
-        const count = this.interfaces.length;
-        if (count === 1) {
-            const angle = 0;
-        } else {
-            const angle = (index / Math.max(count - 1, 1)) * Math.PI * 2;
-        }
-        const radius = Math.max(this.width, this.height) / 2 + 8;
-
         return {
-            x: this.x + Math.cos(angle) * radius,
-            y: this.y + Math.sin(angle) * radius
+            x: this.x,
+            y: this.y
         };
     }
 
@@ -249,10 +266,21 @@ export class Device {
                 id: intf.id,
                 name: intf.name,
                 type: intf.type,
-                // Add any interface-specific state here
+                ip: intf.ip,
+                mask: intf.mask,
+                status: intf.status
             })),
             config: this.config
         };
+    }
+
+    // ID Generation Utility
+    static generateId(prefix = 'id') {
+        if (window.crypto && window.crypto.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        // Fallback for non-secure contexts (HTTP)
+        return `${prefix}-${Math.random().toString(36).slice(2, 11)}`;
     }
 
     // Deserialization

@@ -25,12 +25,56 @@ body {
 }
 
 aside#palette {
-    width: 250px;
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 320px;
+    height: 180px; /* Un po' più alto per fare spazio alle tab */
     background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.palette-tabs {
+    display: flex;
+    background-color: #0d1117;
+    border-bottom: 1px solid #30363d;
+}
+
+.palette-tab {
+    flex: 1;
+    padding: 8px;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #8b949e;
+    cursor: pointer;
     border-right: 1px solid #30363d;
-    padding: 1rem;
+    transition: all 0.2s;
+}
+
+.palette-tab:last-child {
+    border-right: none;
+}
+
+.palette-tab.active {
+    background-color: #161b22;
+    color: #58a6ff;
+    border-bottom: 2px solid #58a6ff;
+}
+
+.palette-content {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 10px;
     overflow-y: auto;
-    flex-shrink: 0;
 }
 
 #canvas-container {
@@ -39,6 +83,7 @@ aside#palette {
     background-color: #010409;
     overflow: hidden;
     touch-action: none;
+    cursor: default;
 }
 
 #main-canvas {
@@ -80,9 +125,10 @@ aside#palette {
 /* Palette item styling */
 .palette-item {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
+    justify-content: center;
+    padding: 8px;
     background-color: #21262d;
     border-radius: 6px;
     cursor: grab;
@@ -93,18 +139,25 @@ aside#palette {
 
 .palette-item:hover {
     background-color: #30363d;
-    transform: translateY(-2px);
+    transform: scale(1.02);
 }
 
 .palette-item:active {
     cursor: grabbing;
 }
 
+.palette-item.selected {
+    border-color: #58a6ff;
+    background-color: #1f2937;
+    box-shadow: inset 0 0 0 1px #58a6ff;
+}
+
 .palette-icon {
-    width: 24px;
-    height: 24px;
-    margin-right: 0.75px;
-    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 4px;
+    pointer-events: none;
+    object-fit: contain;
 }
 
 .palette-label {

@@ -47,7 +47,7 @@ if ($filename) {
     exit;
 } else {
     // List all saves
-    $files = array_filter(scandir($savesDir), function($file) {
+    $files = array_filter(scandir($savesDir), function($file) use ($savesDir) {
         return is_file($savesDir . '/' . $file) && pathinfo($file, PATHINFO_EXTENSION) === 'json';
     });
 
@@ -66,9 +66,9 @@ if ($filename) {
         ];
     }
 
-    // Sort by timestamp descending
+    // Sort by filename timestamp descending (more reliable than mtime)
     usort($saves, function($a, $b) {
-        return $b['timestamp'] - $a['timestamp'];
+        return strcmp($b['filename'], $a['filename']);
     });
 
     http_response_code(200);

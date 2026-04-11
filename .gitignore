@@ -38,3 +38,6 @@ Thumbs.db
 
 # Misc
 .BUG_TRACKER.md
+
+# Saves
+/public/data/saves

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurazione Dispositivo</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background-color: #0d1117;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .config-tabs {
+            display: flex;
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 0 10px;
+        }
+        .tab-btn {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn:hover {
+            color: #c9d1d9;
+        }
+        .tab-btn.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            display: none;
+            padding: 20px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .physical-view {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 200px;
+            background: #010409;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .form-section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .config-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: #161b22;
+        }
+        #terminal-container {
+            flex: 1;
+            background: #000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <header class="config-header">
+        <h2 id="device-title">Caricamento...</h2>
+        <div id="connection-status" style="font-size: 0.8rem; color: #10b981;">● Online</div>
+    </header>
+    
+    <nav class="config-tabs">
+        <button class="tab-btn active" data-tab="physical">Physical</button>
+        <button class="tab-btn" data-tab="config">Config</button>
+        <button class="tab-btn" data-tab="cli">CLI</button>
+    </nav>
+
+    <div id="physical" class="tab-content active">
+        <div class="physical-view" id="physical-img">
+            <!-- Icona del dispositivo -->
+        </div>
+        <div class="form-section">
+            <h3>Moduli / Porte</h3>
+            <ul id="ports-list" style="list-style: none; padding: 0; margin-top: 10px;"></ul>
+        </div>
+    </div>
+
+    <div id="config" class="tab-content">
+        <div class="form-section">
+            <h3>Impostazioni Globali</h3>
+            <div class="modal-form-group">
+                <label class="modal-label">Hostname</label>
+                <input type="text" id="config-hostname" class="modal-input">
+            </div>
+        </div>
+        <div id="interface-configs">
+            <!-- Dinamicamente caricato -->
+        </div>
+    </div>
+
+    <div id="cli" class="tab-content" style="padding: 0; flex: 1;">
+        <div id="terminal-container">
+            <div id="terminal" style="height: 100%; border: none;"></div>
+        </div>
+    </div>
+
+    <script src="js/ui/config-loader.js" type="module"></script>
+</body>
+</html>

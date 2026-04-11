@@ -8,11 +8,18 @@ export class StorageManager {
 
     async loadNetwork() {
         try {
-            const data = localStorage.getItem(this.storageKey);
-            if (data) {
-                return JSON.parse(data);
+            // Priority to API if running on a server, fallback to local storage
+            let data = null;
+            if (window.location.protocol.startsWith('http')) {
+                data = await this.loadFromAPI();
             }
-            return null;
+            if (!data) {
+                const localData = localStorage.getItem(this.storageKey);
+                if (localData) {
+                    data = JSON.parse(localData);
+                }
+            }
+            return data;
         } catch (error) {
             console.error('Error loading network from storage:', error);
             return null;
@@ -26,7 +33,14 @@ export class StorageManager {
                 version: networkData.version || '1.0',
                 timestamp: networkData.timestamp || Date.now()
             };
+            
+            // localSave
             localStorage.setItem(this.storageKey, JSON.stringify(dataToSave));
+
+            // Remote save if possible
+            if (window.location.protocol.startsWith('http')) {
+                this.saveToAPI(dataToSave).catch(e => console.warn('API Save unavailable', e));
+            }
 
             // Clear and restart auto-save timer
             this.clearAutoSave();
@@ -43,7 +57,7 @@ export class StorageManager {
         if (this.autoSaveInterval) return;
         this.autoSaveInterval = setInterval(() => {
             // Trigger a save event - actual saving happens elsewhere
-            document.dispatchEvent(new CustomService('pt-simulator:autosave'));
+            document.dispatchEvent(new CustomEvent('pt-simulator:autosave'));
         }, this.autoSaveDelay);
     }
 
@@ -65,6 +79,36 @@ export class StorageManager {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    async saveToAPI(data) {
+        try {
+            const response = await fetch('/api/save.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            return await response.json();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async loadFromAPI() {
+        try {
+            const response = await fetch('/api/load.php');
+            if (response.ok) {
+                const list = await response.json();
+                if (list.saves && list.saves.length > 0) {
+                    const latest = list.saves[0].filename;
+                    const res = await fetch('/api/load.php?file=' + latest);
+                    return await res.json();
+                }
+            }
+            return null;
+        } catch (e) {
+            return null;
+        }
     }
 
     importJSON(file) {

@@ -8,7 +8,7 @@ export class Server extends Device {
             type: 'server',
             model: options.model || 'server-generic',
             name: options.name || 'Server',
-            width: options.width || 70,
+            width: options.width || 65,
             height: options.height || 50
         });
 
@@ -16,8 +16,8 @@ export class Server extends Device {
         if (this.interfaces.length === 0) {
             this.interfaces = [
                 {
-                    id: crypto.randomUUID(),
-                    name: 'eth0',
+                    id: Device.generateId(),
+                    name: 'GigabitEthernet0',
                     type: 'gigabitethernet',
                     speed: 1000,
                     duplex: 'full',
@@ -26,8 +26,8 @@ export class Server extends Device {
                     status: 'down'
                 },
                 {
-                    id: crypto.randomUUID(),
-                    name: 'eth1',
+                    id: Device.generateId(),
+                    name: 'GigabitEthernet1',
                     type: 'gigabitethernet',
                     speed: 1000,
                     duplex: 'full',
@@ -47,35 +47,46 @@ export class Server extends Device {
             .join(':');
     }
 
+    getDeviceInfo() {
+        return {
+            icons: {
+                '2d': 'icons/2d/server.png',
+                '3d': 'icons/3d/fileserver.svg'
+            }
+        };
+    }
+
     render(ctx) {
         super.render(ctx);
 
-        // Draw server-specific icon (tower/server-like)
-        ctx.save();
-        ctx.translate(this.x, this.y);
+        // Draw server-specific icon details (fallback only)
+        if (!this.imageLoaded) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
 
-        // Server chassis
-        ctx.fillStyle = '#21262d';
-        ctx.strokeStyle = '#30363d';
-        ctx.lineWidth = 1;
+            // Server chassis
+            ctx.fillStyle = '#21262d';
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
 
-        ctx.beginPath();
-        ctx.roundRect(-30, -25, 60, 50, 4);
-        ctx.fill();
-        ctx.stroke();
+            ctx.beginPath();
+            ctx.roundRect(-30, -25, 60, 50, 4);
+            ctx.fill();
+            ctx.stroke();
 
-        // Drive bays indicator
-        ctx.fillStyle = '#6b7280';
-        for (let i = 0; i < 3; i++) {
-            ctx.fillRect(-25 + i * 15, 10, 8, 4);
+            // Drive bays indicator
+            ctx.fillStyle = '#6b7280';
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(-25 + i * 15, 10, 8, 4);
+            }
+
+            // Power/status lights
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.arc(20, -15, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
         }
-
-        // Power/status lights
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(20, -15, 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
     }
 }

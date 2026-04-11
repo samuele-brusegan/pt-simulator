@@ -8,44 +8,41 @@ export class Switch extends Device {
             type: 'switch',
             model: options.model || 'switch-2960',
             name: options.name || 'Switch',
-            width: options.width || 80,
-            height: options.height || 50
+            width: options.width || 70,
+            height: options.height || 45
         });
 
         // Set default interfaces if none provided
         if (this.interfaces.length === 0) {
-            this.interfaces = [
-                {
-                    id: crypto.randomUUID(),
-                    name: 'FastEthernet0/1',
+            this.interfaces = [];
+            
+            // 24 FastEthernet ports
+            for (let i = 1; i <= 24; i++) {
+                this.interfaces.push({
+                    id: Device.generateId(),
+                    name: `FastEthernet0/${i}`,
                     type: 'fastethernet',
                     speed: 100,
                     duplex: 'full',
                     mac: this.generateMAC(),
                     ip: null,
                     status: 'down'
-                },
-                {
-                    id: crypto.randomUUID(),
-                    name: 'FastEthernet0/2',
-                    type: 'fastethernet',
-                    speed: 100,
+                });
+            }
+            
+            // 2 GigabitEthernet ports
+            for (let i = 1; i <= 2; i++) {
+                this.interfaces.push({
+                    id: Device.generateId(),
+                    name: `GigabitEthernet0/${i}`,
+                    type: 'gigabitethernet',
+                    speed: 1000,
                     duplex: 'full',
                     mac: this.generateMAC(),
                     ip: null,
                     status: 'down'
-                },
-                {
-                    id: crypto.randomUUID(),
-                    name: 'FastEthernet0/24',
-                    type: 'fastethernet',
-                    speed: 100,
-                    duplex: 'full',
-                    mac: this.generateMAC(),
-                    ip: null,
-                    status: 'down'
-                }
-            ];
+                });
+            }
 
             // Add VLAN capability
             this.vlans = {
@@ -62,32 +59,43 @@ export class Switch extends Device {
             .join(':');
     }
 
+    getDeviceInfo() {
+        return {
+            icons: {
+                '2d': 'icons/2d/switch.png',
+                '3d': 'icons/3d/workgroup switch.svg'
+            }
+        };
+    }
+
     render(ctx) {
         super.render(ctx);
 
-        // Draw switch-specific icon (switch-like shape)
-        ctx.save();
-        ctx.translate(this.x, this.y);
+        // Draw switch-specific icon (fallback only)
+        if (!this.imageLoaded) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
 
-        // Switch body
-        ctx.fillStyle = '#21262d';
-        ctx.strokeStyle = '#30363d';
-        ctx.lineWidth = 1;
+            // Switch body
+            ctx.fillStyle = '#21262d';
+            ctx.strokeStyle = '#30363d';
+            ctx.lineWidth = 1;
 
-        // Main switch body
-        ctx.beginPath();
-        ctx.roundRect(-30, -20, 60, 40, 4);
-        ctx.fill();
-        ctx.stroke();
+            // Main switch body
+            ctx.beginPath();
+            ctx.roundRect(-30, -20, 60, 40, 4);
+            ctx.fill();
+            ctx.stroke();
 
-        // Port indicators (simplified)
-        ctx.fillStyle = '#6b7280';
-        for (let i = 0; i < 3; i++) {
-            const x = -20 + i * 20;
-            ctx.fillRect(x, -25, 3, 3);
+            // Port indicators (simplified)
+            ctx.fillStyle = '#6b7280';
+            for (let i = 0; i < 3; i++) {
+                const x = -20 + i * 20;
+                ctx.fillRect(x, -25, 3, 3);
+            }
+
+            ctx.restore();
         }
-
-        ctx.restore();
     }
 
     // VLAN management

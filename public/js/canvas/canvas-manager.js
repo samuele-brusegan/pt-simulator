@@ -1,4 +1,6 @@
 // Canvas Manager - Handles rendering and user interaction
+import { Cable } from '../network/cable.js';
+
 export class CanvasManager {
     constructor(canvasElement) {
         this.canvas = canvasElement;
@@ -11,12 +13,17 @@ export class CanvasManager {
 
         // Interaction state
         this.isPanning = false;
+        this.isDraggingDevice = false;
+        this.draggedDevice = null;
+        this.dragOffsetX = 0;
+        this.dragOffsetY = 0;
         this.lastPanX = 0;
         this.lastPanY = 0;
 
         // Grid settings
         this.gridSize = 20;
         this.gridColor = '#21262d';
+        this.activeCableType = null; // Set when selected in palette
 
         // Event handlers
         this.clickHandlers = [];
@@ -40,8 +47,14 @@ export class CanvasManager {
     }
 
     bindEvents() {
+        // Prevent browser context menu on canvas to avoid blocking interactions
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
         // Mouse down - start panning, device selection, or cable creation
         this.canvas.addEventListener('mousedown', (e) => {
+            // Only handle left click
+            if (e.button !== 0) return;
+            
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -56,22 +69,36 @@ export class CanvasManager {
             );
 
             if (clickedDevice) {
-                // Check if click is near a port (within 10px)
-                const port = clickedDevice.getNearestPort(worldX, worldY, 10);
-                if (port) {
-                    // Start cable creation
-                    this.isCreatingCable = true;
-                    this.cableStartDevice = clickedDevice;
-                    this.cableStartPort = port;
-                    // Create temporary cable
-                    this.tempCable = null;
-                    // Notify click handlers that we're starting cable creation
-                    this.clickHandlers.forEach(handler => handler(worldX, worldY, {type: 'cableStart', device: clickedDevice, port}));
-                    return;
+                // Check for port ONLY if we want to create a cable
+                if (this.activeCableType) {
+                    // If a cable type is selected, we just need ANY port on this device
+                    // to start the connection. We ignore the distance threshold.
+                    const port = clickedDevice.interfaces.find(intf => {
+                        // Check if port is already connected
+                        return !this.cables.some(c => 
+                            (c.startDevice === clickedDevice && c.startPort === intf) ||
+                            (c.endDevice === clickedDevice && c.endPort === intf)
+                        );
+                    });
+
+                    if (port) {
+                        this.isCreatingCable = true;
+                        this.cableStartDevice = clickedDevice;
+                        this.cableStartPort = port;
+                        this.tempCable = null;
+                        return;
+                    }
                 }
+
+                // If not creating cable, start dragging the device
+                this.isDraggingDevice = true;
+                this.draggedDevice = clickedDevice;
+                this.dragOffsetX = worldX - clickedDevice.x;
+                this.dragOffsetY = worldY - clickedDevice.y;
+                return;
             }
 
-            // For now, treat as potential pan start (or device click)
+            // For now, treat as potential pan start 
             this.isPanning = true;
             this.lastPanX = x;
             this.lastPanY = y;
@@ -96,8 +123,15 @@ export class CanvasManager {
                 );
 
                 if (hoveredDevice && hoveredDevice !== this.cableStartDevice) {
-                    // Check if mouse is near a port on the hovered device
-                    const port = hoveredDevice.getNearestPort(worldX, worldY, 15);
+                    // If a cable type is selected, we just need ANY port on this device
+                    const port = hoveredDevice.interfaces.find(intf => {
+                        // Check if port is already connected
+                        return !this.cables.some(c => 
+                            (c.startDevice === hoveredDevice && c.startPort === intf) ||
+                            (c.endDevice === hoveredDevice && c.endPort === intf)
+                        );
+                    });
+
                     if (port) {
                         // Valid end point found
                         if (this.tempCable) {
@@ -115,7 +149,7 @@ export class CanvasManager {
                                 startPort: this.cableStartPort,
                                 endDevice: hoveredDevice,
                                 endPort: port,
-                                type: 'ethernet-straight' // Default, user can change via context menu
+                                type: this.activeCableType || 'ethernet-straight'
                             });
                         }
                     } else {
@@ -126,6 +160,25 @@ export class CanvasManager {
                     // Mouse not over a valid device, clear temp cable
                     this.tempCable = null;
                 }
+            } else if (this.isDraggingDevice && this.draggedDevice) {
+                // Update device position
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const worldX = (x - this.offsetX) / this.scale;
+                const worldY = (y - this.offsetY) / this.scale;
+
+                // Snap to grid (20px)
+                const newX = Math.round((worldX - this.dragOffsetX) / 20) * 20;
+                const newY = Math.round((worldY - this.dragOffsetY) / 20) * 20;
+                
+                this.draggedDevice.setPosition(newX, newY);
+                
+                // Notify via callback for saving
+                if (this.deviceDragHandler) {
+                    this.deviceDragHandler(this.draggedDevice);
+                }
+                return;
             } else if (!this.isPanning) {
                 // Not doing anything, return early
                 return;
@@ -186,16 +239,42 @@ export class CanvasManager {
                 this.cableStartDevice = null;
                 this.cableStartPort = null;
                 this.tempCable = null;
+            } else if (this.isDraggingDevice) {
+                this.isDraggingDevice = false;
+                this.draggedDevice = null;
+                // Final save notification
+                document.dispatchEvent(new CustomEvent('deviceUpdated'));
             } else {
                 // Normal mouse up - end panning
                 this.isPanning = false;
             }
         });
 
-        // Mouse leave - end panning if cursor leaves
+        // Global mouse up to ensure state reset only if NOT handled by canvas
+        // This prevents the global reset from stealing events needed for cable completion
+        window.addEventListener('mouseup', (e) => {
+            if (e.target === this.canvas) return; // Let the canvas listener handle it
+            
+            if (this.isCreatingCable) {
+                this.resetInteractionState();
+            } else if (this.isDraggingDevice) {
+                this.isDraggingDevice = false;
+                this.draggedDevice = null;
+                document.dispatchEvent(new CustomEvent('deviceUpdated'));
+            } else {
+                this.isPanning = false;
+            }
+        });
+
+        // Mouse leave - end interaction if cursor leaves canvas area
         this.canvas.addEventListener('mouseleave', () => {
+            // We don't necessarily want to stop dragging if we leave, 
+            // but for safety we'll reset panning
             this.isPanning = false;
         });
+
+        // Ensure state is reset if window loses focus
+        window.addEventListener('blur', () => this.resetInteractionState());
 
         // Wheel - handle zooming
         this.canvas.addEventListener('wheel', (e) => {
@@ -257,10 +336,27 @@ export class CanvasManager {
             this.isPanning = false;
         });
 
+        // Handle cable type selection from palette
+        document.addEventListener('pt-simulator:cableTypeSelected', (e) => {
+            this.activeCableType = e.detail.type;
+            // Optionally change cursor or visual state
+            this.canvas.style.cursor = this.activeCableType ? 'crosshair' : 'default';
+        });
+
         // Handle resize
         window.addEventListener('resize', () => this.resize());
 
         // Handle drop events for device creation
+        this.canvas.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            this.canvas.style.outline = '2px dashed #58a6ff';
+            this.canvas.style.outlineOffset = '-4px';
+        });
+
+        this.canvas.addEventListener('dragleave', (e) => {
+            this.canvas.style.outline = 'none';
+        });
+
         this.canvas.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'copy';
@@ -268,13 +364,18 @@ export class CanvasManager {
 
         this.canvas.addEventListener('drop', (e) => {
             e.preventDefault();
+            this.canvas.style.outline = 'none';
+            
             const deviceType = e.dataTransfer.getData('text/plain');
             if (deviceType && this.dropHandler) {
                 const rect = this.canvas.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
+                
+                // Convert screen coordinates to world coordinates
                 const worldX = (x - this.offsetX) / this.scale;
                 const worldY = (y - this.offsetY) / this.scale;
+                
                 this.dropHandler(worldX, worldY, deviceType);
             }
         });
@@ -322,24 +423,31 @@ export class CanvasManager {
         const ctx = this.ctx;
         const width = this.canvas.width;
         const height = this.canvas.height;
-
+        
+        // Grid should be drawn in world coordinates
+        // We'll figure out the visible range
+        const start = this.screenToWorld(0, 0);
+        const end = this.screenToWorld(width, height);
+        
         ctx.save();
         ctx.strokeStyle = this.gridColor;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1 / this.scale; // Keep grid lines thin
 
         // Vertical lines
-        for (let x = 0; x <= width; x += this.gridSize * this.scale) {
+        const firstX = Math.floor(start.x / this.gridSize) * this.gridSize;
+        for (let x = firstX; x <= end.x; x += this.gridSize) {
             ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
+            ctx.moveTo(x, start.y);
+            ctx.lineTo(x, end.y);
             ctx.stroke();
         }
 
         // Horizontal lines
-        for (let y = 0; y <= height; y += this.gridSize * this.scale) {
+        const firstY = Math.floor(start.y / this.gridSize) * this.gridSize;
+        for (let y = firstY; y <= end.y; y += this.gridSize) {
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
+            ctx.moveTo(start.x, y);
+            ctx.lineTo(end.x, y);
             ctx.stroke();
         }
 
@@ -350,15 +458,32 @@ export class CanvasManager {
     startRenderLoop() {
         const render = () => {
             this.clear();
+            
+            this.ctx.save();
+            // Apply global transformation
+            this.ctx.translate(this.offsetX, this.offsetY);
+            this.ctx.scale(this.scale, this.scale);
+            
             this.renderGrid();
+            
             // Render temporary cable (if creating)
             if (this.tempCable) {
                 this.tempCable.render(this.ctx);
             }
+            
             // Render cables first (behind devices)
             this.cables.forEach(cable => cable.render(this.ctx));
+            
             // Render devices
             this.devices.forEach(device => device.render(this.ctx));
+            
+            this.ctx.restore();
+
+            // Render UI overlays (not scaled/translated)
+            if (this.activeCableType) {
+                this.renderCableModeIndicator();
+            }
+            
             requestAnimationFrame(render);
         };
 
@@ -384,5 +509,34 @@ export class CanvasManager {
 
     onCableEnd(callback) {
         this.cableEndHandler = callback;
+    }
+
+    resetInteractionState() {
+        this.isPanning = false;
+        this.isDraggingDevice = false;
+        this.draggedDevice = null;
+        this.isCreatingCable = false;
+        this.cableStartDevice = null;
+        this.cableStartPort = null;
+        this.tempCable = null;
+    }
+
+    renderCableModeIndicator() {
+        const ctx = this.ctx;
+        ctx.save();
+        
+        const text = `CABLE MODE: ${this.activeCableType.toUpperCase()}`;
+        ctx.font = 'bold 12px sans-serif';
+        const width = ctx.measureText(text).width;
+        
+        ctx.fillStyle = 'rgba(248, 81, 73, 0.9)'; // Reddish
+        ctx.fillRect(10, 10, width + 20, 24);
+        
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 20, 22);
+        
+        ctx.restore();
     }
 }
