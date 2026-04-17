@@ -13,8 +13,20 @@
         <div id="canvas-container">
             <canvas id="main-canvas"></canvas>
         </div>
-        <div id="terminal"></div>
     </div>
+    
+    <!-- Custom Modal for Delete Confirmation -->
+    <div id="delete-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Confirm Deletion</h3>
+            <p id="delete-modal-message">Are you sure you want to delete this item?</p>
+            <div class="modal-buttons">
+                <button id="delete-confirm" class="btn btn-danger">Delete</button>
+                <button id="delete-cancel" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/app.js" type="module"></script>
 </body>
 </html>

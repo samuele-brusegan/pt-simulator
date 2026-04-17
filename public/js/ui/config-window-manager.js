@@ -43,11 +43,37 @@ export class ConfigWindowManager {
         const win = window.open(
             `config.html?deviceId=${deviceId}`,
             `config_${deviceId}`,
-            `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+            `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no,personalbar=no,directories=no`
         );
 
         if (win) {
             this.windows.set(deviceId, win);
+            
+            // Set configured state when window gets focus
+            win.addEventListener('focus', () => {
+                const device = this.simulator.devices.find(d => d.id === deviceId);
+                if (device) {
+                    device.setConfigured(true);
+                }
+            });
+
+            // Reset configured state when window loses focus
+            win.addEventListener('blur', () => {
+                const device = this.simulator.devices.find(d => d.id === deviceId);
+                if (device) {
+                    device.setConfigured(false);
+                }
+            });
+            
+            // Reset configured state when window closes
+            win.addEventListener('beforeunload', () => {
+                this.windows.delete(deviceId);
+                const device = this.simulator.devices.find(d => d.id === deviceId);
+                if (device) {
+                    device.setConfigured(false);
+                }
+                console.log('Config window closed for device:', deviceId);
+            });
         } else {
             alert('Per favore abilita i pop-up per aprire la configurazione del dispositivo.');
         }
@@ -80,8 +106,7 @@ export class ConfigWindowManager {
                 });
             }
             
-            // Notify system for re-render
-            this.simulator.renderNetwork();
+            // Notify system for re-render (render loop handles it automatically)
             this.simulator.saveNetwork();
             
             // Broadcast the update back to other windows if needed (optional)
@@ -90,13 +115,7 @@ export class ConfigWindowManager {
     }
 
     handleCLICommandFromWindow(deviceId, command) {
-        // Technically the terminal manager in the config window can handle its own state,
-        // but we might want to sync clinical output back to main app if it's open there too.
-        // For now, the main app's terminal manager might not be showing the same device.
-        
-        // If the active device in main app is this one, we might want to sync.
-        if (this.simulator.terminalManager.activeDevice && this.simulator.terminalManager.activeDevice.id === deviceId) {
-            // Actually, it's better if they just share the device object state.
-        }
+        // CLI commands are now handled entirely within the config window's TerminalManager.
+        // No sync needed to main app since terminalManager was removed from PTSimulator.
     }
 }

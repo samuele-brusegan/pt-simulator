@@ -8,8 +8,8 @@ export class PC extends Device {
             type: 'pc',
             model: options.model || 'pc-generic',
             name: options.name || 'PC',
-            width: options.width || 60,
-            height: options.height || 45
+            width: options.width || 70,
+            height: options.height || 50
         });
 
         // Set default interfaces if none provided

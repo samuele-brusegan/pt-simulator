@@ -1,20 +1,19 @@
 // Base Device Class
 export class Device {
     constructor(options = {}) {
-        this.id = options.id || Device.generateId();
-        this.type = options.type || 'generic';
+        this.id = options.id || crypto.randomUUID();
+        this.name = options.name || 'Device';
+        this.type = options.type || 'device';
         this.model = options.model || 'unknown';
-        this.name = options.name || `${this.type.charAt(0).toUpperCase() + this.type.slice(1)}`;
-
-        // Position and transformation
-        this.x = options.x || 0;
-        this.y = options.y || 0;
+        this.x = options.x || 100;
+        this.y = options.y || 100;
         this.rotation = options.rotation || 0; // in degrees
 
         // Visual properties
-        this.width = options.width || 60;
-        this.height = options.height || 40;
+        this.width = options.width || 70;
+        this.height = options.height || 50;
         this.selected = false;
+        this.configured = false; // Track if config window is open
 
         // Interfaces (ports)
         this.interfaces = options.interfaces || [];
@@ -29,8 +28,8 @@ export class Device {
         // Connection tracking
         this.connectedCables = [];
 
-        // Image icon for rendering
-        this.iconStyle = localStorage.getItem('pt-simulator-icon-style') || '2d';
+        // Image icon for rendering - use 3D by default if no preference saved
+        this.iconStyle = localStorage.getItem('pt-simulator-icon-style') || '3d';
         this.image = new Image();
         this.imageLoaded = false;
         this.loadIcon();
@@ -73,6 +72,15 @@ export class Device {
 
     isSelected() {
         return this.selected;
+    }
+
+    // Configuration window state
+    setConfigured(configured) {
+        this.configured = configured;
+    }
+
+    isConfigured() {
+        return this.configured;
     }
 
     // Interface management
@@ -158,6 +166,13 @@ export class Device {
             ctx.strokeStyle = '#fbbf24';
             ctx.lineWidth = 2;
             ctx.strokeRect(-this.width / 2 - 2, -this.height / 2 - 2, this.width + 4, this.height + 4);
+        }
+
+        // Draw configuration highlight if config window is open
+        if (this.configured) {
+            ctx.strokeStyle = '#58a6ff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-this.width / 2 - 3, -this.height / 2 - 3, this.width + 6, this.height + 6);
         }
 
         // Draw device label below

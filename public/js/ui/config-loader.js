@@ -80,15 +80,22 @@ class ConfigLoader {
         data.interfaces.forEach(intf => {
             const section = document.createElement('div');
             section.className = 'form-section';
+            const cidr = this.maskToCIDR(intf.mask);
             section.innerHTML = `
                 <h4>${intf.name}</h4>
                 <div class="modal-form-group">
                     <label class="modal-label">IP Address</label>
                     <input type="text" value="${intf.ip || ''}" data-intf-id="${intf.id}" data-field="ip" class="modal-input intf-input">
                 </div>
-                <div class="modal-form-group">
-                    <label class="modal-label">Subnet Mask</label>
-                    <input type="text" value="${intf.mask || ''}" data-intf-id="${intf.id}" data-field="mask" class="modal-input intf-input">
+                <div class="modal-form-group" style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label class="modal-label">Subnet Mask</label>
+                        <input type="text" value="${intf.mask || ''}" data-intf-id="${intf.id}" data-field="mask" class="modal-input intf-input">
+                    </div>
+                    <div style="width: 80px;">
+                        <label class="modal-label">CIDR</label>
+                        <input type="text" value="${cidr || ''}" data-intf-id="${intf.id}" data-field="cidr" class="modal-input intf-input">
+                    </div>
                 </div>
                 <div class="modal-form-group">
                     <label class="modal-label">Port Status</label>
@@ -144,7 +151,35 @@ class ConfigLoader {
                 // Find and update in our local copy
                 const intf = this.deviceData.interfaces.find(i => i.id === intfId);
                 if (intf) {
-                    intf[field] = value;
+                    // Handle CIDR/Mask conversion
+                    if (field === 'cidr') {
+                        // Convert CIDR to mask
+                        intf.mask = this.cidrToMask(value);
+                        // Update the mask field in UI
+                        const maskInput = document.querySelector(`input[data-intf-id="${intfId}"][data-field="mask"]`);
+                        if (maskInput) maskInput.value = intf.mask;
+                    } else if (field === 'mask') {
+                        // Convert mask to CIDR
+                        const cidr = this.maskToCIDR(value);
+                        // Update the CIDR field in UI
+                        const cidrInput = document.querySelector(`input[data-intf-id="${intfId}"][data-field="cidr"]`);
+                        if (cidrInput) cidrInput.value = cidr;
+                    } else if (field === 'ip') {
+                        // Auto-set subnet mask based on IP class if mask is empty
+                        if (!intf.mask || intf.mask === '') {
+                            const autoMask = this.getAutoMaskForIP(value);
+                            if (autoMask) {
+                                intf.mask = autoMask;
+                                const maskInput = document.querySelector(`input[data-intf-id="${intfId}"][data-field="mask"]`);
+                                if (maskInput) maskInput.value = autoMask;
+                                const cidrInput = document.querySelector(`input[data-intf-id="${intfId}"][data-field="cidr"]`);
+                                if (cidrInput) cidrInput.value = this.maskToCIDR(autoMask);
+                            }
+                        }
+                    } else {
+                        intf[field] = value;
+                    }
+                    
                     this.sendUpdate({ interfaces: this.deviceData.interfaces });
                     
                     // Also sync terminal mock
@@ -176,6 +211,67 @@ class ConfigLoader {
             deviceId: this.deviceId,
             data: partialData
         });
+    }
+
+    // Convert subnet mask to CIDR notation
+    maskToCIDR(mask) {
+        if (!mask) return '';
+        const parts = mask.split('.');
+        if (parts.length !== 4) return '';
+        
+        let bits = 0;
+        let binaryStr = '';
+        
+        for (const part of parts) {
+            const n = parseInt(part);
+            // Validate octet is 0-255
+            if (isNaN(n) || n < 0 || n > 255) return '';
+            
+            // Convert to 8-bit binary string
+            const octetBinary = n.toString(2).padStart(8, '0');
+            binaryStr += octetBinary;
+            bits += octetBinary.split('1').length - 1;
+        }
+        
+        // Check for contiguous mask (no gaps like 10101010)
+        // A valid subnet mask should be all 1s followed by all 0s
+        const match = binaryStr.match(/^1*0*$/);
+        if (!match) return '';
+        
+        return `/${bits}`;
+    }
+
+    // Convert CIDR notation to subnet mask
+    cidrToMask(cidr) {
+        if (!cidr) return '';
+        const bits = parseInt(cidr.replace('/', ''));
+        if (isNaN(bits) || bits < 0 || bits > 32) return '';
+        
+        let mask = 0xffffffff << (32 - bits);
+        mask = mask >>> 0; // Convert to unsigned 32-bit
+        
+        return [
+            (mask >>> 24) & 0xff,
+            (mask >>> 16) & 0xff,
+            (mask >>> 8) & 0xff,
+            mask & 0xff
+        ].join('.');
+    }
+
+    // Get auto subnet mask based on IP class
+    getAutoMaskForIP(ip) {
+        if (!ip) return '';
+        const firstOctet = parseInt(ip.split('.')[0]);
+        if (isNaN(firstOctet)) return '';
+        
+        if (firstOctet >= 1 && firstOctet <= 126) {
+            return '255.0.0.0'; // Class A - /8
+        } else if (firstOctet >= 128 && firstOctet <= 191) {
+            return '255.255.0.0'; // Class B - /16
+        } else if (firstOctet >= 192 && firstOctet <= 223) {
+            return '255.255.255.0'; // Class C - /24
+        }
+        return '';
     }
 }
 

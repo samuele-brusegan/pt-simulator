@@ -8,7 +8,7 @@ export class Server extends Device {
             type: 'server',
             model: options.model || 'server-generic',
             name: options.name || 'Server',
-            width: options.width || 65,
+            width: options.width || 70,
             height: options.height || 50
         });
 

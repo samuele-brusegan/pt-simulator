@@ -102,8 +102,14 @@ export class TerminalManager {
         // Clear input
         this.inputField.value = '';
 
-        // Show command in output
-        this.print(`>${command}`);
+        // Show command in output with full prompt
+        let promptSuffix = '>';
+        if (this.cliMode === 'privileged') promptSuffix = '#';
+        else if (this.cliMode === 'global') promptSuffix = '(config)#';
+        else if (this.cliMode === 'interface') promptSuffix = '(config-if)#';
+        
+        const fullPrompt = this.activeDevice ? `${this.activeDevice.name}${promptSuffix}` : '>';
+        this.print(`${fullPrompt} ${command}`);
 
         // Process command
         if (this.activeDevice) {
@@ -121,7 +127,23 @@ export class TerminalManager {
         const cmdRaw = parts[0].toLowerCase();
         const args = parts.slice(1);
 
-        // Global commands available from anywhere
+        // Mode-specific command parsing (check before global commands)
+        switch (this.cliMode) {
+            case 'user':
+                this.processUserMode(cmdRaw, args);
+                break;
+            case 'privileged':
+                this.processPrivilegedMode(cmdRaw, args);
+                break;
+            case 'global':
+                this.processGlobalMode(cmdRaw, args);
+                break;
+            case 'interface':
+                this.processInterfaceMode(cmdRaw, args);
+                break;
+        }
+
+        // Global commands available from anywhere (checked after mode-specific)
         if (this.isMatch(cmdRaw, 'exit')) {
             if (this.cliMode === 'interface') {
                 this.cliMode = 'global';
@@ -149,28 +171,12 @@ export class TerminalManager {
             this.printHelp();
             return;
         }
-
-        // Mode-specific command parsing
-        switch (this.cliMode) {
-            case 'user':
-                this.processUserMode(cmdRaw, args);
-                break;
-            case 'privileged':
-                this.processPrivilegedMode(cmdRaw, args);
-                break;
-            case 'global':
-                this.processGlobalMode(cmdRaw, args);
-                break;
-            case 'interface':
-                this.processInterfaceMode(cmdRaw, args);
-                break;
-        }
     }
 
     // Utility for matching command shortcuts
     isMatch(input, fullCommand) {
         if (!input) return false;
-        return fullCommand.startsWith(input.toLowerCase());
+        return fullCommand.toLowerCase().startsWith(input.toLowerCase());
     }
 
     processUserMode(cmd, args) {
@@ -188,7 +194,7 @@ export class TerminalManager {
         if (this.isMatch(cmd, 'configure')) {
             if (args[0] && this.isMatch(args[0], 'terminal')) {
                 this.cliMode = 'global';
-                this.print('Enter configuration commands, one per line. End with CNTL/Z.');
+                this.print('Enter configuration commands, one per line. End with CTRL+Z.');
                 this.updatePrompt();
             } else {
                 this.printError('% Incomplete command.');
@@ -208,12 +214,12 @@ export class TerminalManager {
                 this.printError('% Incomplete command.');
             }
         } else {
-            this.printError(`% Invalid input detected at '^' marker.`);
+            this.printError(`% Invalid input detected at '^' marker.`, true, cmd);
         }
     }
 
     processGlobalMode(cmd, args) {
-        if (cmd === 'hostname') {
+        if (this.isMatch(cmd, 'hostname')) {
             if (args[0]) {
                 const newName = args[0];
                 this.activeDevice.name = newName;
@@ -223,7 +229,7 @@ export class TerminalManager {
             } else {
                 this.printError('Incomplete command.');
             }
-        } else if (cmd === 'interface' || cmd === 'int') {
+        } else if (this.isMatch(cmd, 'interface') || cmd === 'int') {
             if (args[0]) {
                 // Find interface (handle shorthand like fa0/1 or GigabitEthernet0/0)
                 let searchName = args[0];
@@ -248,7 +254,7 @@ export class TerminalManager {
         } else if (cmd === 'do' && args[0] === 'show') {
              this.handleShowCommand(args.slice(1));
         } else {
-            this.printError(`% Invalid input detected at '^' marker.`);
+            this.printError(`% Invalid input detected at '^' marker.`, true, cmd);
         }
     }
 
@@ -268,24 +274,24 @@ export class TerminalManager {
                     this.printError('Incomplete command.');
                 }
             } else {
-                this.printError(`% Invalid input detected at '^' marker.`);
+                this.printError(`% Invalid input detected at '^' marker.`, true, args[0] || cmd);
             }
-        } else if (cmd === 'shutdown' || cmd === 'shut') {
+        } else if (this.isMatch(cmd, 'shutdown')) {
             this.currentInterface.status = 'down';
             this.print(`\n%LINK-5-CHANGED: Interface ${this.currentInterface.name}, changed state to administratively down`);
             document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
         } else if (cmd === 'no') {
-            if (args[0] === 'shutdown' || args[0] === 'shut') {
+            if (this.isMatch(args[0], 'shutdown')) {
                 this.currentInterface.status = 'up';
                 this.print(`\n%LINK-3-UPDOWN: Interface ${this.currentInterface.name}, changed state to up`);
                 document.dispatchEvent(new CustomEvent('deviceUpdated', { detail: this.activeDevice }));
             } else {
-                this.printError(`% Invalid input detected at '^' marker.`);
+                this.printError(`% Invalid input detected at '^' marker.`, true, args[0] || cmd);
             }
         } else if (cmd === 'do' && args[0] === 'show') {
             this.handleShowCommand(args.slice(1));
         } else {
-            this.printError(`% Invalid input detected at '^' marker.`);
+            this.printError(`% Invalid input detected at '^' marker.`, true, cmd);
         }
     }
 
@@ -327,7 +333,7 @@ export class TerminalManager {
                 this.print('Cisco IOS Software, C2911 Software (C2911-UNIVERSALK9-M), Version 15.2(4)M1, RELEASE SOFTWARE (fc1)');
                 break;
             default:
-                this.printError(`Invalid input detected at '${args[0]}' marker.`);
+                this.printError(`Invalid input detected at '${args[0]}' marker.`, true, args[0]);
         }
     }
 
@@ -413,7 +419,24 @@ export class TerminalManager {
         this.output.appendChild(line);
     }
 
-    printError(text) {
+    printError(text, showMarker = false, command = "") {
+        // Print marker first if requested - position it under the command
+        if (showMarker && command) {
+            const markerLine = document.createElement("div");
+            // Calculate position: the marker should be under the last character of the command
+            const promptLength = this.activeDevice ? this.activeDevice.name.length + 2 : 1; // +2 for "> " or "# "
+            const commandLength = command.length;
+            const spaces = ' '.repeat(promptLength + commandLength);
+            markerLine.textContent = spaces + '^';
+            markerLine.style.color = "#f85149";
+            markerLine.style.fontFamily = "Fira Code, Courier New, monospace";
+            markerLine.style.fontSize = "0.9rem";
+            markerLine.style.lineHeight = '1.4';
+            markerLine.style.whiteSpace = 'pre';
+            this.output.appendChild(markerLine);
+        }
+        
+        // Then print the error message
         const line = document.createElement('div');
         line.textContent = text;
         line.style.color = '#f85149';

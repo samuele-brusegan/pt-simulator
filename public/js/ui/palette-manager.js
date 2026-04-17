@@ -93,6 +93,7 @@ export class PaletteManager {
         }
         
         // Notify app about active cable type
+        console.log('Cable type selected:', type);
         document.dispatchEvent(new CustomEvent('pt-simulator:cableTypeSelected', { detail: { type } }));
     }
 
@@ -153,10 +154,10 @@ export class PaletteManager {
     renderConnections() {
         const cableTypes = [
             { id: null, name: 'Select', icon: '🖱️' },
-            { id: 'ethernet-straight', name: 'Straight', color: '#000000' },
-            { id: 'ethernet-cross', name: 'Cross', color: '#000000', dashed: true },
+            { id: 'ethernet-straight', name: 'Straight', color: '#c9d1d9' },
+            { id: 'ethernet-cross', name: 'Cross', color: '#c9d1d9', dashed: true },
             { id: 'console', name: 'Console', color: '#58a6ff' },
-            { id: 'serial-dce', name: 'Serial', color: '#d29922' }
+            { id: 'serial', name: 'Serial', color: '#f85149' }
         ];
 
         cableTypes.forEach(cable => {

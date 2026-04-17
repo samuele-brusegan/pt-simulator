@@ -3,7 +3,6 @@ import { CanvasManager } from './canvas/canvas-manager.js';
 import { StorageManager } from './storage/storage.js';
 import { DeviceFactory } from './devices/device-factory.js';
 import { PaletteManager } from './ui/palette-manager.js';
-import { TerminalManager } from './cli/terminal-manager.js';
 import { ConfigWindowManager } from './ui/config-window-manager.js';
 import { Cable } from './network/cable.js';
 
@@ -13,10 +12,10 @@ class PTSimulator {
         this.storageManager = new StorageManager();
         this.deviceFactory = new DeviceFactory();
         this.paletteManager = null;
-        this.terminalManager = null;
         this.configWindowManager = new ConfigWindowManager(this);
         this.devices = [];
         this.cables = [];
+        this.deleteMode = false; // Track if in delete mode
 
         this.init();
     }
@@ -33,7 +32,6 @@ class PTSimulator {
             // Initialize managers
             this.canvasManager = new CanvasManager(document.getElementById('main-canvas'));
             this.paletteManager = new PaletteManager(document.getElementById('palette'), this.deviceFactory);
-            this.terminalManager = new TerminalManager(document.getElementById('terminal'), this);
 
             // Load saved network or create new one
             await this.loadNetwork();
@@ -91,13 +89,17 @@ class PTSimulator {
                     }
                 });
 
-                this.renderNetwork();
+                // Update canvas-manager references
+                this.canvasManager.devices = this.devices;
+                this.canvasManager.cables = this.cables;
             }
         } catch (error) {
             console.warn('Could not load network data:', error);
             // Start with empty network
             this.devices = [];
             this.cables = [];
+            this.canvasManager.devices = this.devices;
+            this.canvasManager.cables = this.cables;
         }
     }
 
@@ -113,24 +115,32 @@ class PTSimulator {
 
     addDevice(device) {
         this.devices.push(device);
+        this.canvasManager.devices = this.devices;
         this.saveNetwork();
         return device;
     }
 
     removeDevice(device) {
-        const index = this.devices.indexOf(device);
-        if (index !== -1) {
-            // Remove any cables connected to this device
-            this.cables = this.cables.filter(cable =>
-                cable.startDevice !== device && cable.endDevice !== device
-            );
-            this.devices.splice(index, 1);
-            this.saveNetwork();
-        }
+        console.log('removeDevice called for:', device);
+        // Remove device from array
+        this.devices = this.devices.filter(d => d.id !== device.id);
+
+        // Remove all cables connected to this device
+        this.cables = this.cables.filter(cable =>
+            cable.startDevice !== device && cable.endDevice !== device
+        );
+
+        // Update canvas-manager references
+        this.canvasManager.devices = this.devices;
+        this.canvasManager.cables = this.cables;
+
+        console.log('Devices after removal:', this.devices.length);
+        this.saveNetwork();
     }
 
     addCable(cable) {
         this.cables.push(cable);
+        this.canvasManager.cables = this.cables;
         // Update device connections
         cable.startDevice.addConnection(cable);
         cable.endDevice.addConnection(cable);
@@ -139,23 +149,11 @@ class PTSimulator {
     }
 
     removeCable(cable) {
-        const index = this.cables.indexOf(cable);
-        if (index !== -1) {
-            // Update device connections
-            cable.startDevice.removeConnection(cable);
-            cable.endDevice.removeConnection(cable);
-            this.cables.splice(index, 1);
-            this.saveNetwork();
-        }
+        this.cables = this.cables.filter(c => c.id !== cable.id);
+        this.canvasManager.cables = this.cables;
+        this.saveNetwork();
     }
 
-    renderNetwork() {
-        this.canvasManager.clear();
-        // Render cables first (behind devices)
-        this.cables.forEach(cable => cable.render(this.canvasManager.getContext()));
-        // Render devices
-        this.devices.forEach(device => device.render(this.canvasManager.getContext()));
-    }
 
     setupEventListeners() {
         // Handle device creation from palette (legacy center placement)
@@ -181,24 +179,43 @@ class PTSimulator {
                 device.containsPoint(x, y)
             );
 
-            // Deselect all devices
+            // Check if clicked on a cable
+            const clickedCable = this.cables.find(cable =>
+                cable.containsPoint(x, y)
+            );
+
+            // If in delete mode, show confirmation for clicked item
+            if (this.deleteMode) {
+                console.log('Delete mode active, clickedDevice:', clickedDevice, 'clickedCable:', clickedCable);
+                if (clickedDevice) {
+                    this.showDeleteModal('device', clickedDevice);
+                    this.exitDeleteMode();
+                } else if (clickedCable) {
+                    this.showDeleteModal('cable', clickedCable);
+                    this.exitDeleteMode();
+                } else {
+                    // Clicked empty space, exit delete mode
+                    this.exitDeleteMode();
+                }
+                return;
+            }
+
+            // Deselect all devices and cables
             this.devices.forEach(device => device.setSelected(false));
+            this.cables.forEach(cable => cable.selected = false);
 
             if (clickedDevice) {
                 clickedDevice.setSelected(true);
-                // Set active device for CLI terminal
-                this.terminalManager.setActiveDevice(clickedDevice);
-                this.terminalManager.focus();
-            } else {
-                // Clicked on empty space, clear terminal
-                this.terminalManager.setActiveDevice(null);
+            } else if (clickedCable) {
+                clickedCable.selected = true;
             }
-
-            this.renderNetwork();
         });
 
         // Handle double click for configuration window
         this.canvasManager.canvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
             const rect = this.canvasManager.canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left - this.canvasManager.offsetX) / this.canvasManager.scale;
             const y = (e.clientY - rect.top - this.canvasManager.offsetY) / this.canvasManager.scale;
@@ -208,9 +225,13 @@ class PTSimulator {
             );
 
             if (clickedDevice) {
+                console.log('Double click on device:', clickedDevice.name);
                 this.configWindowManager.openWindow(clickedDevice.id);
+                // Highlight the device when config window is opened
+                clickedDevice.setConfigured(true);
             }
         });
+
 
         // Handle canvas drops for device creation (from palette drag)
         this.canvasManager.onDrop((x, y, deviceType) => {
@@ -248,23 +269,31 @@ class PTSimulator {
 
         // Handle keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Delete') {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+
                 // Check if we're creating a cable - cancel it
                 if (this.canvasManager.isCreatingCable) {
                     this.canvasManager.isCreatingCable = false;
                     this.canvasManager.cableStartDevice = null;
                     this.canvasManager.cableStartPort = null;
                     this.canvasManager.tempCable = null;
-                    this.renderNetwork(); // Clear temp cable
                     return;
                 }
 
-                const selectedDevice = this.devices.find(device => device.isSelected());
+                // Find selected device or cable
+                const selectedDevice = this.devices.find(device => device.selected);
+                const selectedCable = this.cables.find(cable => cable.selected);
+
                 if (selectedDevice) {
-                    if (confirm('Delete this device?')) {
-                        this.removeDevice(selectedDevice);
-                        this.renderNetwork();
-                    }
+                    // Delete immediately if selected
+                    this.showDeleteModal('device', selectedDevice);
+                } else if (selectedCable) {
+                    // Delete immediately if selected
+                    this.showDeleteModal('cable', selectedCable);
+                } else {
+                    // Enter delete mode
+                    this.enterDeleteMode();
                 }
             }
             // Escape key to cancel cable creation or active tool
@@ -275,25 +304,27 @@ class PTSimulator {
                     this.canvasManager.cableStartPort = null;
                     this.canvasManager.tempCable = null;
                 }
-                
+
+                // Exit delete mode if active
+                if (this.deleteMode) {
+                    this.exitDeleteMode();
+                }
+
                 // Reset active cable type and pointer
                 this.canvasManager.activeCableType = null;
                 this.canvasManager.canvas.style.cursor = 'default';
                 this.paletteManager.clearSelection();
-                
-                this.renderNetwork(); // Clear temp cable and refresh UI
             }
         });
 
         // Handle window resize
         window.addEventListener('resize', () => {
             this.canvasManager.resize();
-            this.renderNetwork();
         });
 
         // Handle device updates from CLI
         document.addEventListener('deviceUpdated', () => {
-            this.renderNetwork();
+            // Render loop will handle update automatically
             this.saveNetwork();
         });
 
@@ -305,8 +336,154 @@ class PTSimulator {
                     device.updateIconStyle(newStyle);
                 }
             });
-            this.renderNetwork();
         });
+    }
+
+    enterDeleteMode() {
+        this.deleteMode = true;
+        this.canvasManager.canvas.style.cursor = 'not-allowed';
+        this.showDeleteNotification();
+        console.log('Entered delete mode');
+    }
+
+    exitDeleteMode() {
+        this.deleteMode = false;
+        this.canvasManager.canvas.style.cursor = 'default';
+        this.hideDeleteNotification();
+        console.log('Exited delete mode');
+    }
+
+    showDeleteNotification() {
+        const notification = document.createElement('div');
+        notification.id = 'delete-notification';
+        notification.style.position = 'fixed';
+        notification.style.top = '20px';
+        notification.style.left = '20px';
+        notification.style.backgroundColor = '#f85149';
+        notification.style.color = 'white';
+        notification.style.padding = '10px 20px';
+        notification.style.borderRadius = '6px';
+        notification.style.fontFamily = "'Fira Code', monospace";
+        notification.style.fontSize = '14px';
+        notification.style.zIndex = '10000';
+        notification.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        notification.textContent = '🗑️ Modalità eliminazione attiva - Clicca su un dispositivo/cavo per eliminarlo';
+        document.body.appendChild(notification);
+    }
+
+    hideDeleteNotification() {
+        const notification = document.getElementById('delete-notification');
+        if (notification) {
+            notification.remove();
+        }
+    }
+
+    showDeleteModal(type, item) {
+        console.log('showDeleteModal called:', type, item);
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.cssText = `
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            min-width: 300px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = `Eliminare ${type === 'device' ? 'dispositivo' : 'cavo'}?`;
+        title.style.cssText = `
+            color: #f85149;
+            margin: 0 0 15px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 16px;
+        `;
+
+        const message = document.createElement('p');
+        message.textContent = type === 'device' 
+            ? `Sei sicuro di voler eliminare il dispositivo "${item.name || item.type}"?` 
+            : 'Sei sicuro di voler eliminare questo cavo?';
+        message.style.cssText = `
+            color: #c9d1d9;
+            margin: 0 0 20px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+        `;
+
+        const buttons = document.createElement('div');
+        buttons.style.cssText = `
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        `;
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Annulla';
+        cancelBtn.style.cssText = `
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+        `;
+        cancelBtn.onclick = () => {
+            if (document.body.contains(modal)) {
+                document.body.removeChild(modal);
+            }
+        };
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Elimina';
+        confirmBtn.style.cssText = `
+            background: #f85149;
+            color: white;
+            border: 1px solid #f85149;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+        `;
+        confirmBtn.onclick = () => {
+            console.log('Confirm delete clicked for:', type, item);
+            if (type === 'device') {
+                this.removeDevice(item);
+            } else if (type === 'cable') {
+                this.removeCable(item);
+            }
+            if (document.body.contains(modal)) {
+                document.body.removeChild(modal);
+            }
+        };
+
+        buttons.appendChild(cancelBtn);
+        buttons.appendChild(confirmBtn);
+
+        modalContent.appendChild(title);
+        modalContent.appendChild(message);
+        modalContent.appendChild(buttons);
+
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
     }
 }
 

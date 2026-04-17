@@ -37,6 +37,7 @@ export class CanvasManager {
         this.cableStartDevice = null;
         this.cableStartPort = null;
         this.tempCable = null;
+        this.clickToConnectMode = false; // New: track if we're in click-to-connect mode
 
         // References to objects to render
         this.devices = [];
@@ -71,8 +72,7 @@ export class CanvasManager {
             if (clickedDevice) {
                 // Check for port ONLY if we want to create a cable
                 if (this.activeCableType) {
-                    // If a cable type is selected, we just need ANY port on this device
-                    // to start the connection. We ignore the distance threshold.
+                    // If a cable type is selected, use click-to-connect logic
                     const port = clickedDevice.interfaces.find(intf => {
                         // Check if port is already connected
                         return !this.cables.some(c => 
@@ -82,19 +82,77 @@ export class CanvasManager {
                     });
 
                     if (port) {
-                        this.isCreatingCable = true;
-                        this.cableStartDevice = clickedDevice;
-                        this.cableStartPort = port;
-                        this.tempCable = null;
+                        if (!this.clickToConnectMode) {
+                            // First click - select start device
+                            this.clickToConnectMode = true;
+                            this.cableStartDevice = clickedDevice;
+                            this.cableStartPort = port;
+                            console.log('First device selected for connection:', clickedDevice.name, port.name);
+                            // Visual feedback - select the device
+                            clickedDevice.setSelected(true);
+                            return;
+                        } else {
+                            // Second click - complete connection
+                            if (clickedDevice !== this.cableStartDevice) {
+                                console.log('Second device selected, creating connection:', clickedDevice.name, port.name);
+                                
+                                // Create cable
+                                const cable = new Cable({
+                                    startDevice: this.cableStartDevice,
+                                    startPort: this.cableStartPort,
+                                    endDevice: clickedDevice,
+                                    endPort: port,
+                                    type: this.activeCableType
+                                });
+
+                                // Validate and add cable
+                                if (Cable.isValidConnection(
+                                    this.cableStartDevice,
+                                    this.cableStartPort,
+                                    clickedDevice,
+                                    port,
+                                    this.activeCableType
+                                )) {
+                                    if (this.cableEndHandler) {
+                                        this.cableEndHandler(cable);
+                                    }
+                                }
+
+                                // Reset selection
+                                this.cableStartDevice.setSelected(false);
+                                this.clickToConnectMode = false;
+                                this.cableStartDevice = null;
+                                this.cableStartPort = null;
+                                return;
+                            } else {
+                                // Clicked same device - cancel selection
+                                console.log('Cancelled connection (same device)');
+                                this.cableStartDevice.setSelected(false);
+                                this.clickToConnectMode = false;
+                                this.cableStartDevice = null;
+                                this.cableStartPort = null;
+                                return;
+                            }
+                        }
+                    } else {
+                        console.warn('No available ports on device:', clickedDevice.name);
                         return;
                     }
                 }
 
-                // If not creating cable, start dragging the device
+                // Notify click handlers BEFORE drag logic (for delete mode, etc.)
+                this.clickHandlers.forEach(handler => handler(worldX, worldY));
+
+                // If not creating cable, start dragging the device (unless in delete mode)
+                if (window.ptSimulator && window.ptSimulator.deleteMode) {
+                    // Don't drag in delete mode, let the click handler handle it
+                    return;
+                }
                 this.isDraggingDevice = true;
                 this.draggedDevice = clickedDevice;
                 this.dragOffsetX = worldX - clickedDevice.x;
                 this.dragOffsetY = worldY - clickedDevice.y;
+                console.log('Device drag started:', clickedDevice.name);
                 return;
             }
 
@@ -102,6 +160,17 @@ export class CanvasManager {
             this.isPanning = true;
             this.lastPanX = x;
             this.lastPanY = y;
+
+            // Cancel click-to-connect mode if clicking on empty space
+            if (this.clickToConnectMode) {
+                console.log('Cancelled connection (clicked empty space)');
+                if (this.cableStartDevice) {
+                    this.cableStartDevice.setSelected(false);
+                }
+                this.clickToConnectMode = false;
+                this.cableStartDevice = null;
+                this.cableStartPort = null;
+            }
 
             // Notify click handlers (they'll determine if it was on a device)
             this.clickHandlers.forEach(handler => handler(worldX, worldY));
@@ -339,6 +408,13 @@ export class CanvasManager {
         // Handle cable type selection from palette
         document.addEventListener('pt-simulator:cableTypeSelected', (e) => {
             this.activeCableType = e.detail.type;
+            // Cancel any pending click-to-connect
+            if (this.clickToConnectMode && this.cableStartDevice) {
+                this.cableStartDevice.setSelected(false);
+            }
+            this.clickToConnectMode = false;
+            this.cableStartDevice = null;
+            this.cableStartPort = null;
             // Optionally change cursor or visual state
             this.canvas.style.cursor = this.activeCableType ? 'crosshair' : 'default';
         });
@@ -519,6 +595,12 @@ export class CanvasManager {
         this.cableStartDevice = null;
         this.cableStartPort = null;
         this.tempCable = null;
+        
+        // Also cancel click-to-connect mode
+        if (this.clickToConnectMode && this.cableStartDevice) {
+            this.cableStartDevice.setSelected(false);
+        }
+        this.clickToConnectMode = false;
     }
 
     renderCableModeIndicator() {

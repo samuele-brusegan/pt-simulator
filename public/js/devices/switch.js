@@ -8,8 +8,8 @@ export class Switch extends Device {
             type: 'switch',
             model: options.model || 'switch-2960',
             name: options.name || 'Switch',
-            width: options.width || 70,
-            height: options.height || 45
+            width: options.width || 80,
+            height: options.height || 50
         });
 
         // Set default interfaces if none provided

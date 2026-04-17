@@ -8,8 +8,8 @@ export class Router extends Device {
             type: 'router',
             model: options.model || 'router-2911',
             name: options.name || 'Router',
-            width: options.width || 70,
-            height: options.height || 45
+            width: options.width || 80,
+            height: options.height || 50
         });
 
         // Set default interfaces if none provided
