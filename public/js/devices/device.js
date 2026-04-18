@@ -22,8 +22,15 @@ export class Device {
         this.config = options.config || {
             hostname: this.name,
             enableSecret: null,
-            interfaces: {}
+            interfaces: {},
+            defaultGateway: options.defaultGateway || null
         };
+        
+        // Default gateway for routing
+        this.defaultGateway = options.defaultGateway || null;
+        
+        // Static routes for routers
+        this.staticRoutes = options.staticRoutes || [];
 
         // Connection tracking
         this.connectedCables = [];
@@ -235,7 +242,7 @@ export class Device {
         return Math.sin(angle) * radius;
     }
 
-    // Get position of a specific interface/port (returns device center as requested)
+    // Get position of a specific interface/port on device edge
     getPortPosition(portName) {
         return {
             x: this.x,
@@ -285,7 +292,9 @@ export class Device {
                 mask: intf.mask,
                 status: intf.status
             })),
-            config: this.config
+            config: this.config,
+            defaultGateway: this.defaultGateway,
+            staticRoutes: this.staticRoutes || []
         };
     }
 

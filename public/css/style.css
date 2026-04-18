@@ -18,6 +18,74 @@ body {
     overflow: hidden;
 }
 
+/* Toolbar styles */
+#toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 10px 20px;
+    height: 50px;
+    flex-shrink: 0;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover:not(:disabled) {
+    background-color: #30363d;
+    border-color: #8b949e;
+    transform: translateY(-1px);
+}
+
+.toolbar-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toolbar-btn.active {
+    background-color: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+}
+
+.toolbar-btn svg {
+    flex-shrink: 0;
+}
+
+.toolbar-btn span {
+    white-space: nowrap;
+}
+
+.selection-info {
+    font-size: 0.85rem;
+    color: #8b949e;
+    margin-left: 10px;
+}
+
 #app {
     display: flex;
     height: 100%;

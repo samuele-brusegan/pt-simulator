@@ -11,6 +11,8 @@ export class Cable {
         this.color = this.getDefaultColor(options.type);
         this.label = options.label || '';
         this.selected = false;
+        this.highlighted = false;
+        this.highlightColor = null;
     }
 
     getDefaultColor(type) {
@@ -194,8 +196,10 @@ export class Cable {
         if (!startPos || !endPos) return;
 
         ctx.save();
-        ctx.strokeStyle = this.color;
-        ctx.lineWidth = this.selected ? 4 : 2;
+        
+        // Use highlight color if highlighted, otherwise use default color
+        ctx.strokeStyle = this.highlighted ? this.highlightColor : this.color;
+        ctx.lineWidth = this.selected ? 4 : (this.highlighted ? 3 : 2);
         ctx.lineCap = 'round';
 
         // Draw straight line

@@ -141,7 +141,7 @@ export class CanvasManager {
                 }
 
                 // Notify click handlers BEFORE drag logic (for delete mode, etc.)
-                this.clickHandlers.forEach(handler => handler(worldX, worldY));
+                this.clickHandlers.forEach(handler => handler(worldX, worldY, e));
 
                 // If not creating cable, start dragging the device (unless in delete mode)
                 if (window.ptSimulator && window.ptSimulator.deleteMode) {
@@ -173,7 +173,7 @@ export class CanvasManager {
             }
 
             // Notify click handlers (they'll determine if it was on a device)
-            this.clickHandlers.forEach(handler => handler(worldX, worldY));
+            this.clickHandlers.forEach(handler => handler(worldX, worldY, e));
         });
 
         // Mouse move - handle panning or cable creation

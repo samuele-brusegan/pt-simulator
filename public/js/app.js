@@ -4,6 +4,7 @@ import { StorageManager } from './storage/storage.js';
 import { DeviceFactory } from './devices/device-factory.js';
 import { PaletteManager } from './ui/palette-manager.js';
 import { ConfigWindowManager } from './ui/config-window-manager.js';
+import { ToolbarManager } from './ui/toolbar-manager.js';
 import { Cable } from './network/cable.js';
 
 class PTSimulator {
@@ -13,6 +14,7 @@ class PTSimulator {
         this.deviceFactory = new DeviceFactory();
         this.paletteManager = null;
         this.configWindowManager = new ConfigWindowManager(this);
+        this.toolbarManager = null;
         this.devices = [];
         this.cables = [];
         this.deleteMode = false; // Track if in delete mode
@@ -32,6 +34,7 @@ class PTSimulator {
             // Initialize managers
             this.canvasManager = new CanvasManager(document.getElementById('main-canvas'));
             this.paletteManager = new PaletteManager(document.getElementById('palette'), this.deviceFactory);
+            this.toolbarManager = new ToolbarManager(this);
 
             // Load saved network or create new one
             await this.loadNetwork();
@@ -174,7 +177,7 @@ class PTSimulator {
         });
 
         // Handle canvas clicks for device selection
-        this.canvasManager.onClick((x, y) => {
+        this.canvasManager.onClick((x, y, event) => {
             const clickedDevice = this.devices.find(device =>
                 device.containsPoint(x, y)
             );
@@ -200,15 +203,35 @@ class PTSimulator {
                 return;
             }
 
-            // Deselect all devices and cables
-            this.devices.forEach(device => device.setSelected(false));
-            this.cables.forEach(cable => cable.selected = false);
+            // Check if in ping mode or Ctrl/Cmd key is pressed for multi-selection
+            const isMultiSelect = this.toolbarManager.pingMode || (event && (event.ctrlKey || event.metaKey));
+
+            if (!isMultiSelect) {
+                // Deselect all devices and cables
+                this.devices.forEach(device => device.setSelected(false));
+                this.cables.forEach(cable => cable.selected = false);
+            }
+
+            // Track selected devices for toolbar
+            let selectedDevices = this.devices.filter(d => d.selected);
 
             if (clickedDevice) {
-                clickedDevice.setSelected(true);
-            } else if (clickedCable) {
+                if (isMultiSelect) {
+                    // Toggle selection
+                    clickedDevice.setSelected(!clickedDevice.selected);
+                } else {
+                    clickedDevice.setSelected(true);
+                }
+                selectedDevices = this.devices.filter(d => d.selected);
+            } else if (clickedCable && !isMultiSelect) {
                 clickedCable.selected = true;
+            } else if (!clickedDevice && !clickedCable && !isMultiSelect) {
+                // Clicked empty space, clear selection
+                selectedDevices = [];
             }
+
+            // Update toolbar with selected devices
+            this.toolbarManager.updateSelection(selectedDevices);
         });
 
         // Handle double click for configuration window

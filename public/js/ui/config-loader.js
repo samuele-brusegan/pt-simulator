@@ -77,6 +77,49 @@ class ConfigLoader {
         const intfContainer = document.getElementById('interface-configs');
         intfContainer.innerHTML = '<h3>Interfacce</h3>';
         
+        // Add Default Gateway field for PCs and Servers
+        if (data.type === 'pc' || data.type === 'server') {
+            const gwSection = document.createElement('div');
+            gwSection.className = 'form-section';
+            gwSection.innerHTML = `
+                <h3>Routing</h3>
+                <div class="modal-form-group">
+                    <label class="modal-label">Default Gateway</label>
+                    <input type="text" id="config-default-gateway" value="${data.defaultGateway || ''}" class="modal-input" placeholder="es. 192.168.0.1">
+                </div>
+            `;
+            intfContainer.appendChild(gwSection);
+            
+            // Add event listener for default gateway
+            document.getElementById('config-default-gateway').addEventListener('change', (e) => {
+                this.sendUpdate({ defaultGateway: e.target.value || null });
+            });
+        }
+        
+        // Add Static Routes field for Routers
+        if (data.type === 'router') {
+            const routesSection = document.createElement('div');
+            routesSection.className = 'form-section';
+            routesSection.innerHTML = `
+                <h3>Rotte Statiche</h3>
+                <div id="static-routes-container"></div>
+                <button id="add-route-btn" class="btn" style="margin-top: 10px;">Aggiungi Rota</button>
+            `;
+            intfContainer.appendChild(routesSection);
+            
+            // Add event listener for adding routes
+            document.getElementById('add-route-btn').addEventListener('click', () => {
+                this.addStaticRouteUI();
+            });
+            
+            // Render existing routes if any
+            if (data.staticRoutes) {
+                data.staticRoutes.forEach(route => {
+                    this.addStaticRouteUI(route);
+                });
+            }
+        }
+        
         data.interfaces.forEach(intf => {
             const section = document.createElement('div');
             section.className = 'form-section';
@@ -272,6 +315,81 @@ class ConfigLoader {
             return '255.255.255.0'; // Class C - /24
         }
         return '';
+    }
+
+    // Add static route UI
+    addStaticRouteUI(existingRoute = null) {
+        const container = document.getElementById('static-routes-container');
+        const routeId = existingRoute ? existingRoute.id : crypto.randomUUID();
+        
+        const routeDiv = document.createElement('div');
+        routeDiv.className = 'static-route-row';
+        routeDiv.dataset.routeId = routeId;
+        routeDiv.style.cssText = `
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        `;
+        
+        routeDiv.innerHTML = `
+            <div style="flex: 1;">
+                <input type="text" class="modal-input route-destination" placeholder="Rete (es. 192.168.1.0)" value="${existingRoute?.destination || ''}">
+            </div>
+            <div style="width: 100px;">
+                <input type="text" class="modal-input route-mask" placeholder="Mask" value="${existingRoute?.mask || ''}">
+            </div>
+            <div style="flex: 1;">
+                <input type="text" class="modal-input route-gateway" placeholder="Gateway" value="${existingRoute?.gateway || ''}">
+            </div>
+            <div style="width: 50px;">
+                <input type="text" class="modal-input route-interface" placeholder="Intf" value="${existingRoute?.interface || ''}">
+            </div>
+            <button class="btn btn-danger remove-route-btn" style="padding: 5px 10px;">×</button>
+        `;
+        
+        // Add event listeners
+        routeDiv.querySelector('.remove-route-btn').addEventListener('click', () => {
+            routeDiv.remove();
+            this.updateStaticRoutes();
+        });
+        
+        routeDiv.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', () => {
+                this.updateStaticRoutes();
+            });
+        });
+        
+        container.appendChild(routeDiv);
+        
+        if (!existingRoute) {
+            this.updateStaticRoutes();
+        }
+    }
+
+    // Update static routes from UI
+    updateStaticRoutes() {
+        const container = document.getElementById('static-routes-container');
+        const routes = [];
+        
+        container.querySelectorAll('.static-route-row').forEach(row => {
+            const destination = row.querySelector('.route-destination').value;
+            const mask = row.querySelector('.route-mask').value;
+            const gateway = row.querySelector('.route-gateway').value;
+            const interfaceName = row.querySelector('.route-interface').value;
+            
+            if (destination && mask) {
+                routes.push({
+                    id: row.dataset.routeId,
+                    destination,
+                    mask,
+                    gateway: gateway || null,
+                    interface: interfaceName || null
+                });
+            }
+        });
+        
+        this.sendUpdate({ staticRoutes: routes });
     }
 }
 
